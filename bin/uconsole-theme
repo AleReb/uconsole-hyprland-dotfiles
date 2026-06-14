@@ -1,0 +1,243 @@
+#!/bin/sh
+set -eu
+
+theme="${1:-select}"
+
+list_themes() {
+    printf '%s\n' default rose green graphite
+}
+
+pick_theme() {
+    if command -v wofi >/dev/null 2>&1; then
+        list_themes | wofi --show dmenu --prompt "Theme"
+    else
+        list_themes
+    fi
+}
+
+apply_theme() {
+    name="$1"
+    case "$name" in
+        default)
+            bg="1f2328"; bg2="101419"; panel="31, 35, 40"; fg="f8fafc"; accent1="93cee9"; accent2="c79bf0"; warn="facc15"; crit="f87171"
+            ;;
+        rose)
+            bg="191724"; bg2="11101a"; panel="25, 23, 36"; fg="e0def4"; accent1="ebbcba"; accent2="c4a7e7"; warn="f6c177"; crit="eb6f92"
+            ;;
+        green)
+            bg="101419"; bg2="0b1010"; panel="16, 20, 25"; fg="e5f9f0"; accent1="8ec07c"; accent2="83a598"; warn="fabd2f"; crit="fb4934"
+            ;;
+        graphite)
+            bg="16181d"; bg2="101217"; panel="22, 24, 29"; fg="f2f4f8"; accent1="c8d0e0"; accent2="8b949e"; warn="d7ba7d"; crit="e06c75"
+            ;;
+        *)
+            printf 'Unknown theme: %s\n' "$name" >&2
+            exit 2
+            ;;
+    esac
+
+    hypr="$HOME/.config/hypr/hyprland.conf"
+    waybar="$HOME/.config/waybar/style.css"
+    wofi_css="$HOME/.config/wofi/style.css"
+    foot_ini="$HOME/.config/foot/foot.ini"
+    dunst_conf="$HOME/.config/dunst/dunstrc"
+    theme_env="$HOME/.config/uconsole/theme.env"
+
+    mkdir -p "$HOME/.config/dunst" "$HOME/.config/uconsole"
+
+    sed -i \
+        -e "s/col.active_border = .*/col.active_border = rgba(${accent1}ff) rgba(${accent2}ff) 45deg/" \
+        -e "s/col.inactive_border = .*/col.inactive_border = rgba(${bg}cc)/" \
+        "$hypr"
+
+    cat > "$theme_env" <<EOF
+UCONSOLE_THEME=${name}
+UCONSOLE_BG=${bg}
+UCONSOLE_BG2=${bg2}
+UCONSOLE_PANEL="${panel}"
+UCONSOLE_FG=${fg}
+UCONSOLE_ACCENT1=${accent1}
+UCONSOLE_ACCENT2=${accent2}
+UCONSOLE_WARN=${warn}
+UCONSOLE_CRIT=${crit}
+EOF
+
+    cat > "$waybar" <<EOF
+* {
+  border: none;
+  font-family: "Nunito Sans", "DejaVu Sans", sans-serif;
+  font-size: 13px;
+  min-height: 0;
+}
+
+window#waybar {
+  background: transparent;
+  color: #${fg};
+}
+
+#workspaces,
+#clock,
+#custom-cpu,
+#custom-gpu,
+#temperature,
+#pulseaudio,
+#network,
+#battery,
+#tray {
+  background: rgba(${panel}, 0.92);
+  border: 1px solid #${accent2};
+  border-radius: 999px;
+  margin: 0 2px;
+}
+
+#workspaces button {
+  padding: 0 8px;
+  border-radius: 999px;
+  color: #${accent1};
+}
+
+#workspaces button.active {
+  background: #${accent1};
+  color: #${bg};
+}
+
+#clock,
+#custom-cpu,
+#custom-gpu,
+#temperature,
+#pulseaudio,
+#network,
+#battery,
+#tray {
+  padding: 0 10px;
+}
+
+#battery.warning {
+  color: #${warn};
+}
+
+#battery.critical,
+#temperature.critical {
+  color: #${crit};
+}
+EOF
+
+    cat > "$wofi_css" <<EOF
+window {
+  background-color: rgba(${panel}, 0.96);
+  color: #${fg};
+  font-family: "Nunito Sans", "DejaVu Sans", sans-serif;
+  font-size: 14px;
+  border: 1px solid #${accent2};
+  border-radius: 12px;
+}
+
+#input {
+  margin: 8px;
+  padding: 10px;
+  border: 1px solid #${accent1};
+  border-radius: 10px;
+  background-color: #${bg2};
+  color: #${fg};
+}
+
+#entry {
+  padding: 9px 12px;
+}
+
+#entry:selected {
+  background-color: #${accent1};
+  color: #${bg};
+}
+EOF
+
+    cat > "$foot_ini" <<EOF
+[main]
+font=DejaVu Sans Mono:size=11
+pad=8x8
+term=xterm-256color
+
+[colors]
+background=${bg}
+foreground=${fg}
+regular0=${bg}
+regular1=${crit}
+regular2=10b981
+regular3=${warn}
+regular4=${accent1}
+regular5=${accent2}
+regular6=${accent1}
+regular7=e5e7eb
+EOF
+
+    cat > "$dunst_conf" <<EOF
+[global]
+monitor = 0
+follow = none
+width = 320
+height = (0, 120)
+origin = top-right
+offset = (10, 44)
+scale = 0
+notification_limit = 3
+font = DejaVu Sans 10
+line_height = 2
+padding = 10
+horizontal_padding = 12
+text_icon_padding = 8
+frame_width = 2
+frame_color = "#${accent2}"
+separator_color = frame
+corner_radius = 10
+progress_bar = true
+progress_bar_height = 8
+progress_bar_frame_width = 0
+progress_bar_min_width = 180
+progress_bar_max_width = 280
+markup = full
+format = "<b>%s</b>\\n%b"
+show_age_threshold = -1
+ignore_newline = false
+
+[urgency_low]
+background = "#${bg}ee"
+foreground = "#${fg}"
+timeout = 3
+
+[urgency_normal]
+background = "#${bg}ee"
+foreground = "#${fg}"
+timeout = 4
+
+[urgency_critical]
+background = "#${bg}ee"
+foreground = "#${crit}"
+frame_color = "#${crit}"
+timeout = 0
+EOF
+
+    printf '%s\n' "$name" > "${XDG_CACHE_HOME:-$HOME/.cache}/uconsole/theme"
+
+    hyprctl reload >/dev/null 2>&1 || true
+    pkill -x dunst >/dev/null 2>&1 || true
+    pkill -x waybar >/dev/null 2>&1 || true
+    if hyprctl dispatch exec dunst >/dev/null 2>&1; then
+        hyprctl dispatch exec waybar >/dev/null 2>&1 || true
+    else
+        dunst >/dev/null 2>&1 &
+        "$HOME/.local/bin/uconsole-waybar-restart" >/dev/null 2>&1 &
+    fi
+}
+
+case "$theme" in
+    list)
+        list_themes
+        ;;
+    select)
+        chosen="$(pick_theme)"
+        [ -n "$chosen" ] && apply_theme "$chosen"
+        ;;
+    *)
+        apply_theme "$theme"
+        ;;
+esac

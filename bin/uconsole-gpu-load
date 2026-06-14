@@ -1,0 +1,34 @@
+#!/bin/sh
+stats="/sys/devices/platform/axi/1002000000.v3d/gpu_stats"
+state="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole/gpu.stat"
+mkdir -p "$(dirname "$state")"
+
+[ -r "$stats" ] || {
+    printf 'G n/a\n'
+    exit 0
+}
+
+line="$(awk 'NR == 2 { print $2, $4 }' "$stats")"
+set -- $line
+timestamp="${1:-0}"
+runtime="${2:-0}"
+
+if [ -r "$state" ]; then
+    read -r prev_timestamp prev_runtime < "$state" || true
+else
+    prev_timestamp=$timestamp
+    prev_runtime=$runtime
+fi
+
+printf '%s %s\n' "$timestamp" "$runtime" > "$state"
+
+dt=$((timestamp - prev_timestamp))
+dr=$((runtime - prev_runtime))
+if [ "$dt" -le 0 ] || [ "$dr" -lt 0 ]; then
+    usage=0
+else
+    usage=$(( (100 * dr) / dt ))
+    [ "$usage" -gt 100 ] && usage=100
+fi
+
+printf 'G %s%%\n' "$usage"

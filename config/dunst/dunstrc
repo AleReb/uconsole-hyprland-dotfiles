@@ -1,0 +1,43 @@
+[global]
+monitor = 0
+follow = none
+width = 320
+height = (0, 120)
+origin = top-right
+offset = (10, 44)
+scale = 0
+notification_limit = 3
+font = DejaVu Sans 10
+line_height = 2
+padding = 10
+horizontal_padding = 12
+text_icon_padding = 8
+frame_width = 2
+frame_color = "#c79bf0"
+separator_color = frame
+corner_radius = 10
+progress_bar = true
+progress_bar_height = 8
+progress_bar_frame_width = 0
+progress_bar_min_width = 180
+progress_bar_max_width = 280
+markup = full
+format = "<b>%s</b>\n%b"
+show_age_threshold = -1
+ignore_newline = false
+
+[urgency_low]
+background = "#1f2328ee"
+foreground = "#f8fafc"
+timeout = 3
+
+[urgency_normal]
+background = "#1f2328ee"
+foreground = "#f8fafc"
+timeout = 4
+
+[urgency_critical]
+background = "#1f2328ee"
+foreground = "#f87171"
+frame_color = "#f87171"
+timeout = 0

@@ -1,0 +1,82 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+BACKUP="$HOME/.config/cfg_backups/uconsole-dotfiles-$(date +%Y%m%d-%H%M%S)"
+
+need_cmd() {
+    command -v "$1" >/dev/null 2>&1 || {
+        printf 'Missing command: %s\n' "$1" >&2
+        exit 1
+    }
+}
+
+need_cmd install
+need_cmd cp
+need_cmd mkdir
+
+mkdir -p "$BACKUP"
+
+for dir in hypr waybar wofi foot dunst uconsole; do
+    if [ -e "$HOME/.config/$dir" ]; then
+        cp -a "$HOME/.config/$dir" "$BACKUP/"
+    fi
+done
+
+for file in brightness_osd.sh volume_osd.sh; do
+    if [ -e "$HOME/.config/$file" ]; then
+        cp -a "$HOME/.config/$file" "$BACKUP/"
+    fi
+done
+
+if [ -e "$HOME/.local/bin" ]; then
+    mkdir -p "$BACKUP/local-bin"
+    find "$HOME/.local/bin" -maxdepth 1 -type f -name 'uconsole-*' -exec cp -a {} "$BACKUP/local-bin/" \;
+fi
+
+if [ -e /etc/keyd/default.conf ]; then
+    printf 'Backing up /etc/keyd/default.conf requires sudo.\n'
+    sudo cp -a /etc/keyd/default.conf "/etc/keyd/default.conf.backup.$(date +%Y%m%d-%H%M%S)"
+fi
+
+mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share/wallpapers" "$HOME/Pictures/Wallpapers"
+
+cp -a "$ROOT/config/hypr" "$HOME/.config/"
+cp -a "$ROOT/config/waybar" "$HOME/.config/"
+cp -a "$ROOT/config/wofi" "$HOME/.config/"
+cp -a "$ROOT/config/foot" "$HOME/.config/"
+cp -a "$ROOT/config/dunst" "$HOME/.config/"
+cp -a "$ROOT/config/uconsole" "$HOME/.config/"
+cp -a "$ROOT/config/brightness_osd.sh" "$HOME/.config/"
+cp -a "$ROOT/config/volume_osd.sh" "$HOME/.config/"
+chmod +x "$HOME/.config/brightness_osd.sh" "$HOME/.config/volume_osd.sh"
+cp -a "$ROOT/bin"/uconsole-* "$HOME/.local/bin/"
+chmod +x "$HOME/.local/bin"/uconsole-*
+if [ -f "$ROOT/bin/mpvpaper" ]; then
+    cp -a "$ROOT/bin/mpvpaper" "$ROOT/bin/mpvpaper-holder" "$HOME/.local/bin/"
+    chmod +x "$HOME/.local/bin/mpvpaper" "$HOME/.local/bin/mpvpaper-holder"
+fi
+
+if [ -f "$ROOT/keyd/default.conf" ]; then
+    sudo install -m 0644 "$ROOT/keyd/default.conf" /etc/keyd/default.conf
+    sudo systemctl enable --now keyd
+    sudo systemctl restart keyd
+fi
+
+if ! grep -q 'uconsole-fastfetch-shown' "$HOME/.bashrc" 2>/dev/null; then
+    cat >> "$HOME/.bashrc" <<'EOF'
+
+# Show compact system info once per graphical login session.
+if command -v fastfetch >/dev/null 2>&1 && [ -t 1 ]; then
+    uconsole_fastfetch_stamp="${XDG_RUNTIME_DIR:-/tmp}/uconsole-fastfetch-shown"
+    if [ ! -e "$uconsole_fastfetch_stamp" ]; then
+        : > "$uconsole_fastfetch_stamp"
+        fastfetch --logo none --key-width 8 --bar-width 8 --structure Title:OS:Kernel:Uptime:Packages:Shell:WM:Terminal:CPU:GPU:Memory:Disk:Battery
+    fi
+    unset uconsole_fastfetch_stamp
+fi
+EOF
+fi
+
+printf 'Installed. Backup: %s\n' "$BACKUP"
+printf 'Choose Hyprland (uwsm-managed) from LightDM when available.\n'

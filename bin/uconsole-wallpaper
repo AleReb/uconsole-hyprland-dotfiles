@@ -1,0 +1,127 @@
+#!/bin/sh
+set -eu
+
+state_dir="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole"
+state_file="$state_dir/wallpaper"
+config="$HOME/.config/hypr/hyprpaper.conf"
+swaybg_pid="$state_dir/swaybg.pid"
+wall_dirs="$HOME/.local/share/wallpapers $HOME/Pictures/Wallpapers /usr/share/hypr"
+
+mkdir -p "$state_dir"
+
+list_wallpapers() {
+    for dir in $wall_dirs; do
+        [ -d "$dir" ] || continue
+        if [ "$dir" = "/usr/share/hypr" ]; then
+            find "$dir" -maxdepth 1 -type f -iname 'wall*.png'
+        else
+            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.webm' \)
+        fi
+    done | sort -u
+}
+
+is_animated_wallpaper() {
+    case "$1" in
+        *.[Gg][Ii][Ff]|*.[Mm][Pp]4|*.[Ww][Ee][Bb][Mm]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+stop_wallpaper_processes() {
+    if [ -s "$swaybg_pid" ]; then
+        kill "$(cat "$swaybg_pid")" >/dev/null 2>&1 || true
+    fi
+    pkill -x hyprpaper >/dev/null 2>&1 || true
+    pkill -x swaybg >/dev/null 2>&1 || true
+    pkill -x mpvpaper >/dev/null 2>&1 || true
+    pgrep -a mpv 2>/dev/null | awk '/uconsole-animated-wallpaper/ { print $1 }' | while read -r pid; do
+        kill "$pid" >/dev/null 2>&1 || true
+    done
+    rm -f "$swaybg_pid"
+}
+
+set_wallpaper() {
+    img="$1"
+    [ -f "$img" ] || exit 1
+
+    printf '%s\n' "$img" > "$state_file"
+    {
+        printf 'preload = %s\n' "$img"
+        printf 'wallpaper = ,%s\n' "$img"
+        printf 'splash = false\n'
+    } > "$config"
+
+    apply_wallpaper "$img"
+}
+
+apply_wallpaper() {
+    img="${1:-}"
+    if [ -z "$img" ]; then
+        img="$(cat "$state_file" 2>/dev/null || sed -n 's/^wallpaper = ,//p' "$config" | head -n 1)"
+    fi
+    [ -f "$img" ] || img="$HOME/.local/share/wallpapers/wall1.png"
+    [ -f "$img" ] || exit 1
+
+    stop_wallpaper_processes
+
+    if is_animated_wallpaper "$img"; then
+        command -v mpvpaper >/dev/null 2>&1 || {
+            notify-send "Wallpaper" "mpvpaper no esta instalado; no puedo animar GIF/video." >/dev/null 2>&1 || true
+            exit 1
+        }
+
+        mpvpaper -f -o "no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings" ALL "$img" >/dev/null 2>&1
+    else
+        swaybg -m fill -i "$img" >/dev/null 2>&1 &
+        printf '%s\n' "$!" > "$swaybg_pid"
+    fi
+}
+
+pick_wallpaper() {
+    list_wallpapers | wofi --show dmenu --prompt "Wallpaper"
+}
+
+cycle_wallpaper() {
+    direction="$1"
+    current="$(cat "$state_file" 2>/dev/null || sed -n 's/^wallpaper = ,//p' "$config" | head -n 1)"
+    list="$(list_wallpapers)"
+    [ -n "$list" ] || exit 1
+
+    next="$(printf '%s\n' "$list" | awk -v cur="$current" -v dir="$direction" '
+        { items[++n] = $0; if ($0 == cur) i = n }
+        END {
+            if (n == 0) exit 1
+            if (!i) i = 1
+            if (dir == "prev") j = i - 1; else j = i + 1
+            if (j < 1) j = n
+            if (j > n) j = 1
+            print items[j]
+        }')"
+    set_wallpaper "$next"
+}
+
+case "${1:-select}" in
+    set)
+        set_wallpaper "${2:?missing wallpaper path}"
+        ;;
+    select)
+        selected="$(pick_wallpaper)"
+        [ -n "$selected" ] && set_wallpaper "$selected"
+        ;;
+    next)
+        cycle_wallpaper next
+        ;;
+    prev)
+        cycle_wallpaper prev
+        ;;
+    current)
+        cat "$state_file" 2>/dev/null || sed -n 's/^wallpaper = ,//p' "$config" | head -n 1
+        ;;
+    apply)
+        apply_wallpaper "${2:-}"
+        ;;
+    *)
+        printf 'usage: %s [select|next|prev|current|apply|set PATH]\n' "$0" >&2
+        exit 2
+        ;;
+esac

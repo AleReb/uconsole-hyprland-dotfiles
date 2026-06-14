@@ -1,0 +1,3 @@
+#!/bin/sh
+printf '%s\n' 'Press keys in the small window. Look for keysym/name lines. Close the window to exit.'
+exec wev

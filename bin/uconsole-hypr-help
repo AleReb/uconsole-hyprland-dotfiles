@@ -1,0 +1,88 @@
+#!/bin/sh
+exec foot --title "Hyprland keybinds" sh -c 'LESS="-R --use-color -M" less <<'"'"'EOF'"'"'
+Hyprland uConsole - Atajos
+
+Super = la tecla que remapeamos desde KEY_OPEN
+
+Aplicaciones
+  Super + Enter        Terminal
+  Super + T            Terminal
+  Super + A / D        Lanzador de apps
+  Super + E            Archivos
+  Super + C            Editor
+  Super + B            Navegador
+  Super + H            Esta ayuda
+  Super + Shift + B    Reiniciar barra superior
+  Super + Shift + C    CAVA, barras de audio
+  Super + Shift + T    Selector de tema
+
+Ventanas
+  Ctrl + Q             Cerrar ventana
+  Alt + F4             Cerrar ventana
+  Super + Shift + Q    Cerrar ventana
+  Super + Tab          Cambiar a la siguiente ventana
+  Alt + Tab            Cambiar foco
+  Super + F            Pantalla completa
+  Shift + F11          Pantalla completa
+  Super + W            Flotante / mosaico
+  Super + Space        Flotante / mosaico
+  Super + G            Agrupar ventana
+  Super + J            Cambiar orientacion del split
+  Super + Shift + P    Pseudo-tile
+
+Mover foco y ventanas
+  Super + Flechas              Mover foco
+  Super + Shift + Flechas      Mover ventana
+  Super + Alt + Flechas        Cambiar tamano
+  Super + mouse izquierdo      Mover ventana
+  Super + mouse derecho        Cambiar tamano
+  Super + Z                    Mover ventana arrastrando
+  Super + X                    Cambiar tamano arrastrando
+
+Workspaces
+  Super + 1..9 / 0             Ir a workspace 1..10
+  Super + Shift + 1..9 / 0     Mandar ventana a workspace 1..10
+  Super + Ctrl + Derecha       Siguiente workspace
+  Super + Ctrl + Izquierda     Workspace anterior
+  Super + Ctrl + Abajo         Workspace vacio
+  Ctrl + Izquierda/Derecha     Workspace anterior/siguiente existente
+
+Wallpapers
+  Super + Shift + W    Elegir wallpaper
+  Super + Shift + .    Wallpaper siguiente
+  Super + Shift + ,    Wallpaper anterior
+  Tecla wallpaper      Elegir wallpaper
+  Shift + tecla wallpaper Wallpaper siguiente
+  Ctrl + tecla wallpaper  Wallpaper anterior
+
+Guarda wallpapers en:
+  ~/.local/share/wallpapers
+  ~/Pictures/Wallpapers
+
+Scratchpad
+  Super + S            Mostrar/ocultar scratchpad
+  Super + Shift + S    Mandar ventana al scratchpad
+
+El scratchpad es un workspace oculto. Manda ahi una ventana con
+Super+Shift+S y la traes o escondes con Super+S.
+
+Hardware
+  Teclas volumen       Subir/bajar/mute
+  Teclas brillo        Subir/bajar brillo
+  Print                Captura region al portapapeles
+  Super + P            Captura region al portapapeles
+  XF86 media           Play/next/prev
+
+Sistema
+  Super + Shift + R    Recargar Hyprland
+  Super + Shift + E    Salir de Hyprland
+  Super + Delete       Salir de Hyprland
+
+Navegacion de esta ayuda
+  Flechas / rueda      Desplazar
+  PageUp / PageDown    Desplazar por pagina
+  Home / End           Inicio / final
+  /texto               Buscar
+  q                    Cerrar
+EOF
+'
