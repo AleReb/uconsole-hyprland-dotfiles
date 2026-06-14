@@ -77,7 +77,19 @@ Formatos animados soportados:
 .gif .mp4 .webm
 ```
 
-Los animados se aplican con `mpvpaper` como capa de fondo real; no deben aparecer como una ventana normal.
+Los animados se aplican con `mpvpaper` como capa de fondo real; no deben aparecer como una ventana normal. Los `.gif` se convierten automaticamente a una copia cacheada en MP4 a 12 FPS para evitar CPU alta.
+
+Puedes ajustar los FPS antes de aplicar un animado:
+
+```sh
+UCONSOLE_WALLPAPER_FPS=10 uconsole-wallpaper set ~/Pictures/Wallpapers/archivo.gif
+```
+
+Por defecto los animados se limitan a un nucleo y 35% de CPU de ese nucleo:
+
+```sh
+UCONSOLE_WALLPAPER_LIMIT=25 uconsole-wallpaper set ~/Pictures/Wallpapers/archivo.gif
+```
 
 ## Temas
 

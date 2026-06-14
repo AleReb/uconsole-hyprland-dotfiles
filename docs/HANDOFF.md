@@ -30,6 +30,8 @@ network-manager-gnome
 wev
 mpv
 libmpv2
+ffmpeg
+cpulimit
 ```
 
 ## Archivos principales
@@ -53,7 +55,7 @@ libmpv2
 
 ## Decisiones tecnicas
 
-- Wallpaper: imagenes estaticas usan `swaybg`; GIF/MP4/WEBM usan `mpvpaper`. No usar `hyprpaper`, porque `hyprctl hyprpaper wallpaper` quedo colgado y genero carga de CPU alta.
+- Wallpaper: imagenes estaticas usan `swaybg`; GIF/MP4/WEBM usan `mpvpaper`. Los GIF se cachean como MP4 a 12 FPS con `ffmpeg`. `mpvpaper` se ejecuta con `taskset` en un nucleo y `cpulimit` a 35% para evitar CPU alta. No usar `hyprpaper`, porque `hyprctl hyprpaper wallpaper` quedo colgado y genero carga de CPU alta.
 - Escala uConsole actual: monitor DSI con scale `1.07`, cursor 28, Waybar/Foot/Wofi ligeramente agrandados.
 - Temas: `~/.local/bin/uconsole-theme` cambia colores en Hyprland, Waybar, Wofi, Foot, Dunst y OSD.
 - Red: se conserva `nm-applet --indicator` para tener icono WiFi en el tray de Waybar y cambiar redes desde ahi. El modulo `network` de Waybar queda como estado rapido.

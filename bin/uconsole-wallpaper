@@ -6,6 +6,9 @@ state_file="$state_dir/wallpaper"
 config="$HOME/.config/hypr/hyprpaper.conf"
 swaybg_pid="$state_dir/swaybg.pid"
 wall_dirs="$HOME/.local/share/wallpapers $HOME/Pictures/Wallpapers /usr/share/hypr"
+animated_fps="${UCONSOLE_WALLPAPER_FPS:-12}"
+animated_cpu="${UCONSOLE_WALLPAPER_CPU:-3}"
+animated_limit="${UCONSOLE_WALLPAPER_LIMIT:-35}"
 
 mkdir -p "$state_dir"
 
@@ -27,6 +30,34 @@ is_animated_wallpaper() {
     esac
 }
 
+is_gif_wallpaper() {
+    case "$1" in
+        *.[Gg][Ii][Ff]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+animated_playback_file() {
+    img="$1"
+
+    if is_gif_wallpaper "$img" && command -v ffmpeg >/dev/null 2>&1; then
+        key="$(printf '%s' "$img" | cksum | awk '{ print $1 }')"
+        cache="$state_dir/wallpaper-$key-${animated_fps}fps.mp4"
+
+        if [ ! -f "$cache" ] || [ "$img" -nt "$cache" ]; then
+            notify-send "Wallpaper" "Optimizando GIF a ${animated_fps} FPS..." >/dev/null 2>&1 || true
+            ffmpeg -y -i "$img" \
+                -vf "fps=${animated_fps},scale='min(1280,iw)':-2:flags=lanczos" \
+                -an -c:v libx264 -preset veryfast -crf 30 -pix_fmt yuv420p -movflags +faststart \
+                "$cache" >/dev/null 2>&1
+        fi
+
+        printf '%s\n' "$cache"
+    else
+        printf '%s\n' "$img"
+    fi
+}
+
 stop_wallpaper_processes() {
     if [ -s "$swaybg_pid" ]; then
         kill "$(cat "$swaybg_pid")" >/dev/null 2>&1 || true
@@ -34,6 +65,7 @@ stop_wallpaper_processes() {
     pkill -x hyprpaper >/dev/null 2>&1 || true
     pkill -x swaybg >/dev/null 2>&1 || true
     pkill -x mpvpaper >/dev/null 2>&1 || true
+    pkill -x cpulimit >/dev/null 2>&1 || true
     pgrep -a mpv 2>/dev/null | awk '/uconsole-animated-wallpaper/ { print $1 }' | while read -r pid; do
         kill "$pid" >/dev/null 2>&1 || true
     done
@@ -70,7 +102,14 @@ apply_wallpaper() {
             exit 1
         }
 
-        mpvpaper -f -o "no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings" ALL "$img" >/dev/null 2>&1
+        play_file="$(animated_playback_file "$img")"
+        if command -v cpulimit >/dev/null 2>&1 && command -v taskset >/dev/null 2>&1; then
+            cpulimit -f -m -l "$animated_limit" -- nice -n 15 taskset -c "$animated_cpu" mpvpaper -o "no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings vf=fps=${animated_fps}" ALL "$play_file" >/dev/null 2>&1 &
+        elif command -v taskset >/dev/null 2>&1; then
+            nice -n 15 taskset -c "$animated_cpu" mpvpaper -f -o "no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings vf=fps=${animated_fps}" ALL "$play_file" >/dev/null 2>&1
+        else
+            nice -n 15 mpvpaper -f -o "no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings vf=fps=${animated_fps}" ALL "$play_file" >/dev/null 2>&1
+        fi
     else
         swaybg -m fill -i "$img" >/dev/null 2>&1 &
         printf '%s\n' "$!" > "$swaybg_pid"
