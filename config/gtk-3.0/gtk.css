@@ -1,0 +1,20 @@
+tooltip, .tooltip {
+  background-color: rgba(31, 35, 40, 0.96);
+  color: #f8fafc;
+  border: 1px solid #c79bf0;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+tooltip label, .tooltip label {
+  color: #f8fafc;
+}
+
+#yad-calendar-widget,
+#yad-calendar-widget * {
+  font-size: 20px;
+}
+
+#yad-calendar-widget {
+  padding: 14px;
+}
