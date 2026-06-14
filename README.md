@@ -111,6 +111,16 @@ Super + Shift + T
 
 Esto cambia colores de Hyprland, Waybar, Wofi, Foot, Dunst y los OSD de brillo/volumen. Las terminales ya abiertas no cambian todos sus colores hasta abrir una nueva.
 
+## Audio
+
+Las teclas de volumen usan `wpctl` sobre PipeWire. El atajo de subir volumen permite boost por software hasta 200%:
+
+```text
+wpctl set-volume -l 2.0 @DEFAULT_AUDIO_SINK@ 5%+
+```
+
+Sobre 100% el audio puede distorsionar, especialmente en los parlantes pequenos de la uConsole. El rango alto queda disponible para fuentes con volumen original muy bajo.
+
 ## Notas
 
 No es HyDE completo. Es un port pequeno inspirado en HyDE y adaptado a Debian/uConsole. Evita ejecutar instaladores grandes de dotfiles sin revisar, porque pueden pisar:

@@ -8,4 +8,5 @@ sudo apt install -y \
 
 sudo apt install -y -t trixie-backports \
     hyprland uwsm xdg-desktop-portal-hyprland \
-    hypridle hyprlock hyprpolkitagent hyprpaper hyprland-guiutils
+    hypridle hyprlock hyprpolkitagent hyprpaper hyprland-guiutils \
+    pipewire pipewire-pulse wireplumber

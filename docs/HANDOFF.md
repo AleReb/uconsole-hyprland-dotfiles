@@ -32,6 +32,9 @@ mpv
 libmpv2
 ffmpeg
 cpulimit
+pipewire
+pipewire-pulse
+wireplumber
 ```
 
 ## Archivos principales
@@ -55,9 +58,11 @@ cpulimit
 
 ## Decisiones tecnicas
 
+- Estado activo observado el 2026-06-14: tema `rose` y wallpaper `fallout.png`. Esos valores son estado vivo generado por `uconsole-theme` y `uconsole-wallpaper`; el repo conserva `default` y `wall2.png` como base portable.
 - Wallpaper: imagenes estaticas usan `swaybg`; GIF/MP4/WEBM usan `mpvpaper`. Los GIF se cachean como MP4 a 12 FPS con `ffmpeg`. `mpvpaper` se ejecuta con `taskset` en un nucleo y `cpulimit` a 35% para evitar CPU alta. No usar `hyprpaper`, porque `hyprctl hyprpaper wallpaper` quedo colgado y genero carga de CPU alta.
 - Escala uConsole actual: monitor DSI con scale `1.07`, cursor 28, Waybar/Foot/Wofi ligeramente agrandados.
 - Temas: `~/.local/bin/uconsole-theme` cambia colores en Hyprland, Waybar, Wofi, Foot, Dunst y OSD.
+- Audio: las teclas de volumen usan `wpctl`/PipeWire. Subir volumen permite boost por software hasta 200% con `wpctl set-volume -l 2.0`; sobre 100% puede distorsionar en los parlantes pequenos.
 - Red: se conserva `nm-applet --indicator` para tener icono WiFi en el tray de Waybar y cambiar redes desde ahi. El modulo `network` de Waybar queda como estado rapido.
 - CPU/GPU en Waybar:
   - `T` usa thermal zone 0.
