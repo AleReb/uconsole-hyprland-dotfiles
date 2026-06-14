@@ -1,6 +1,6 @@
 #!/bin/sh
 if ! command -v cava >/dev/null 2>&1; then
-    exec foot --title "CAVA" sh -c 'printf "%s\n\n" "CAVA no esta instalado." "Instalalo con: sudo apt install cava"; read _'
+    exec foot --title "CAVA" sh -c 'printf "%s\n\n" "CAVA is not installed." "Install it with: sudo apt install cava"; read _'
 fi
 
 exec foot --title "CAVA audio visualizer" cava

@@ -27,8 +27,22 @@
     }
   },
   "clock": {
-    "format": "{:%H:%M}",
-    "tooltip-format": "{:%A %d %B %Y}"
+    "format": "{:%d %b  %H:%M}",
+    "tooltip-format": "<tt><big>{calendar}</big></tt>",
+    "calendar": {
+      "mode": "month",
+      "mode-mon-col": 3,
+      "weeks-pos": "right",
+      "on-scroll": 1,
+      "format": {
+        "months": "<span color='#c4a7e7'><b>{}</b></span>",
+        "days": "<span color='#e0def4'>{}</span>",
+        "weeks": "<span color='#ebbcba'>W{}</span>",
+        "weekdays": "<span color='#ebbcba'><b>{}</b></span>",
+        "today": "<span color='#191724' background='#ebbcba'><b>{}</b></span>"
+      }
+    },
+    "on-click": "sh -c 'yad --calendar --width=520 --height=420 --fixed --no-buttons --title=Calendar >/dev/null 2>&1 &'"
   },
   "pulseaudio": {
     "format": "VOL {volume}",

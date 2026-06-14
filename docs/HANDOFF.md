@@ -1,13 +1,13 @@
 # Handoff
 
-Estado al crear este paquete:
+State when this package was prepared:
 
-- Sistema: Debian 13 trixie, aarch64, Raspberry Pi CM5/uConsole.
-- Hyprland instalado desde `trixie-backports`.
-- Sesion recomendada: `Hyprland (uwsm-managed)`.
-- Fallback conservado: `rpd-labwc`.
+- System: Debian 13 trixie, aarch64, Raspberry Pi CM5/uConsole.
+- Hyprland is installed from `trixie-backports`.
+- Recommended graphical session: `Hyprland`, which runs `/usr/bin/start-hyprland`.
+- Conserved fallback session: `rpd-labwc`.
 
-## Paquetes relevantes
+## Relevant Packages
 
 ```text
 hyprland
@@ -27,22 +27,37 @@ wl-clipboard
 playerctl
 pavucontrol
 network-manager-gnome
+yad
 wev
 mpv
 libmpv2
 ffmpeg
 cpulimit
+liblz4-1
+libxxhash0
 pipewire
 pipewire-pulse
 wireplumber
 ```
 
-## Archivos principales
+Build-only packages for rebuilding `swww`:
+
+```text
+rustup
+liblz4-dev
+libwayland-dev
+libxkbcommon-dev
+pkg-config
+build-essential
+```
+
+## Main Files
 
 ```text
 ~/.config/hypr/hyprland.conf
 ~/.config/waybar/config
 ~/.config/waybar/style.css
+~/.config/gtk-3.0/gtk.css
 ~/.config/dunst/dunstrc
 ~/.config/uconsole/theme.env
 ~/.config/brightness_osd.sh
@@ -53,54 +68,68 @@ wireplumber
 ~/.local/bin/uconsole-cpu-load
 ~/.local/bin/uconsole-gpu-load
 ~/.local/bin/uconsole-theme
+~/.local/bin/swww
+~/.local/bin/swww-daemon
 /etc/keyd/default.conf
 ```
 
-## Decisiones tecnicas
+## Technical Decisions
 
-- Estado activo observado el 2026-06-14: tema `rose` y wallpaper `fallout.png`. Esos valores son estado vivo generado por `uconsole-theme` y `uconsole-wallpaper`; el repo conserva `default` y `wall2.png` como base portable.
-- Wallpaper: imagenes estaticas usan `swaybg`; GIF/MP4/WEBM usan `mpvpaper`. Los GIF se cachean como MP4 a 12 FPS con `ffmpeg`. `mpvpaper` se ejecuta con `taskset` en un nucleo y `cpulimit` a 35% para evitar CPU alta. No usar `hyprpaper`, porque `hyprctl hyprpaper wallpaper` quedo colgado y genero carga de CPU alta.
-- Escala uConsole actual: monitor DSI con scale `1.07`, cursor 28, Waybar/Foot/Wofi ligeramente agrandados.
-- Temas: `~/.local/bin/uconsole-theme` cambia colores en Hyprland, Waybar, Wofi, Foot, Dunst y OSD.
-- Audio: las teclas de volumen usan `wpctl`/PipeWire. Subir volumen permite boost por software hasta 200% con `wpctl set-volume -l 2.0`; sobre 100% puede distorsionar en los parlantes pequenos.
-- Red: se conserva `nm-applet --indicator` para tener icono WiFi en el tray de Waybar y cambiar redes desde ahi. El modulo `network` de Waybar queda como estado rapido.
-- CPU/GPU en Waybar:
-  - `T` usa thermal zone 0.
-  - `C` calcula carga desde `/proc/stat`.
-  - `G` calcula uso desde `/sys/devices/platform/axi/1002000000.v3d/gpu_stats`.
-- Tecla Super:
-  - La tecla `open` se remapea a `leftmeta` con `keyd`.
-- Tecla wallpaper:
-  - La tecla `unknown` dispara macros:
-    - sola: `Super+Shift+W`
-    - con Shift: `Super+Shift+.`
-    - con Ctrl: `Super+Shift+,`
-- Fastfetch: `.bashrc` usa `${XDG_RUNTIME_DIR}/uconsole-fastfetch-shown` para mostrarlo solo una vez por sesion grafica. Se ejecuta sin logo grande para que no se rompa al dividir la pantalla.
+- Active state observed on 2026-06-14: the live desktop may have a generated theme and selected wallpaper. Those values are user state created by `uconsole-theme` and `uconsole-wallpaper`; the repo keeps portable defaults.
+- Graphical login: systemd should use `graphical.target`, LightDM should be enabled, and `/etc/lightdm/lightdm.conf` can use `autologin-user=uconsole`, `user-session=hyprland`, and `autologin-session=hyprland` for direct boot into the session that calls `/usr/bin/start-hyprland`.
+- Wallpapers: static images use `swaybg`; GIF uses `swww` when available; MP4/WEBM and fallback GIF playback use `mpvpaper`.
+- `swww` was built locally from `~/src/swww` with stable Rust and installed as `~/.local/bin/swww` plus `~/.local/bin/swww-daemon`. The repo also includes those ARM64 binaries under `bin/`.
+- GIF optimization: `scripts/optimize-wallpaper-gifs.sh` creates persistent `*.swww.png` posters and `*.swww.gif` optimized copies when they are smaller than the original. `uconsole-wallpaper` keeps state pointing at the original GIF, loads the poster first to avoid a black boot screen, and then loads the optimized GIF in the background. The picker hides generated sidecars.
+- Fallback animated wallpaper playback: GIF fallback is cached as MP4 at 12 FPS with `ffmpeg`. `mpvpaper` is run with `taskset` and `cpulimit` to reduce CPU pressure.
+- Avoid `hyprpaper` for this device state. Testing showed `hyprctl hyprpaper wallpaper` could hang and create high CPU load.
+- uConsole display scale: DSI output uses scale `1.07`, cursor size 28, and slightly larger Waybar/Foot/Wofi sizing.
+- Theme management: `uconsole-theme` updates Hyprland, Waybar, GTK tooltip/calendar styling, Wofi, Foot, Dunst, and OSD colors.
+- Audio: volume keys use PipeWire through `wpctl`; volume-up allows software boost to 200% with `wpctl set-volume -l 2.0`. Audio above 100% can distort.
+- Network: `nm-applet --indicator` is kept for a clickable WiFi tray icon. The Waybar network module remains a compact status display.
+- Waybar clock: center module shows date/time, hover shows the built-in calendar tooltip, and click opens a larger `yad` calendar. Tooltip rounding and `GtkCalendar` font size are controlled by `config/waybar/style.css` and `config/gtk-3.0/gtk.css`.
+- CPU/GPU in Waybar:
+  - `T` uses thermal zone 0.
+  - `C` calculates CPU load from `/proc/stat`.
+  - `G` calculates V3D load from `/sys/devices/platform/axi/1002000000.v3d/gpu_stats`.
+- Super key: `keyd` remaps the `open` key to `leftmeta`.
+- Wallpaper key: `keyd` maps the `unknown` key to wallpaper macros:
+  - alone: `Super+Shift+W`
+  - with Shift: `Super+Shift+.`
+  - with Ctrl: `Super+Shift+,`
+- Shortcut policy: keep only useful aliases in the base Hyprland config. `Super + T` remains as a terminal alias for the uConsole layout; other actions should stay on a single standard shortcut unless a hardware key needs a dedicated macro.
+- Fastfetch: `.bashrc` uses `${XDG_RUNTIME_DIR}/uconsole-fastfetch-shown` to show compact system info only once per graphical login session.
 
-## Pendiente recomendado
+## Recommended Follow-Up
 
-- Elegir repositorio/fuente de wallpapers.
-- Opcional: integrar `azote` como gestor grafico de wallpapers.
-- Opcional: probar `matugen` o `wallust` para colores generados desde wallpaper.
-- Opcional: reemplazar `uconsole-theme` por un sistema de plantillas mas robusto si se agregan muchos temas.
+- Reboot once and confirm LightDM autologin reaches Hyprland without manual intervention.
+- Keep at least one static PNG wallpaper as a fallback for boot or low-battery situations.
+- Commit the bundled binary update together with `docs/THIRD_PARTY.md` so the repo clearly documents what was built.
+- If disk space matters, remove local build trees such as `~/src/swww` only after confirming the bundled `bin/swww` and `bin/swww-daemon` work from a fresh install.
+- Consider adding screenshots to the repo after the final visual theme is selected.
 
-## Reinstalacion
+## Reinstall
 
-Instalacion completa:
+Full install:
 
 ```sh
 cd ~/uconsole-hyprland-dotfiles
 ./install.sh
 ```
 
-Solo copiar configuraciones:
+Copy only dotfiles and bundled local binaries:
 
 ```sh
 ./scripts/install.sh
 ```
 
-Reconstruir `mpvpaper` localmente:
+Rebuild `mpvpaper`:
 
 ```sh
 ./scripts/build-mpvpaper.sh
+```
+
+Rebuild `swww`:
+
+```sh
+./scripts/build-swww.sh
 ```

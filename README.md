@@ -1,40 +1,25 @@
 # uConsole Hyprland Dotfiles
 
-Configuracion portable para ClockworkPi uConsole con Debian 13/CM5 y Hyprland.
+Portable Debian 13 / Raspberry Pi CM5 Hyprland setup for the ClockworkPi uConsole.
 
-## Que incluye
+## Included
 
-- Hyprland adaptado a pantalla uConsole rotada.
-- Waybar compacta con temperatura, CPU, GPU, volumen, red y bateria.
-- Icono de NetworkManager en el tray de Waybar para cambiar WiFi.
-- Wofi launcher.
-- Foot terminal.
-- Dunst tematizado para OSD de volumen/brillo.
-- Wallpapers estaticos con `swaybg` y animados con `mpvpaper`.
-- CAVA como visualizador de audio.
-- Selector local de temas con `uconsole-theme`.
-- Remapeo `keyd`:
-  - `open = leftmeta` para usar esa tecla como Super.
-  - `unknown` como tecla dedicada de wallpapers.
-- `fastfetch` compacto una vez por sesion grafica, pensado para aguantar pantalla dividida.
+- Hyprland configuration tuned for the rotated uConsole display.
+- Compact Waybar with workspaces, date/time, styled calendar tooltip, temperature, CPU, GPU, volume, network, battery, and tray.
+- NetworkManager tray icon for WiFi changes.
+- Wofi launcher, Foot terminal, Dunst notifications, CAVA audio visualizer, and local theme selector.
+- `keyd` remaps:
+  - `open = leftmeta`, used as `Super`.
+  - `unknown` as a dedicated wallpaper key.
+- Static wallpapers through `swaybg`.
+- Animated GIF wallpapers through the bundled ARM64 `swww` binaries, with `mpvpaper` fallback for GIF/video.
+- Persistent GIF optimization helpers for faster boot wallpaper loading.
+- PipeWire volume keys with optional software boost up to 200%.
+- Compact `fastfetch` once per graphical login session.
 
-## Atajos principales
+## Quick Install
 
-- `Super + H`: ayuda local.
-- `Super + Enter` o `Super + T`: terminal.
-- `Super + A` o `Super + D`: launcher.
-- `Super + Shift + W`: selector de wallpapers.
-- `Super + Shift + T`: selector de temas.
-- Tecla wallpaper: selector de wallpapers.
-- `Shift + tecla wallpaper`: wallpaper siguiente.
-- `Ctrl + tecla wallpaper`: wallpaper anterior.
-- `Super + Alt + flechas`: ajustar tamano de ventana.
-- `Super + Shift + B`: reiniciar Waybar.
-- Icono WiFi en Waybar: cambiar o editar redes.
-
-## Instalacion rapida
-
-En una uConsole limpia con Debian 13:
+On a clean uConsole running Debian 13:
 
 ```sh
 git clone <repo-url>
@@ -42,58 +27,132 @@ cd ~/uconsole-hyprland-dotfiles
 ./install.sh
 ```
 
-Despues cierra sesion y elige `Hyprland (uwsm-managed)` en LightDM si esta disponible.
+Then log out and choose the `Hyprland` session in LightDM. For direct boot, configure LightDM autologin to the `hyprland` session; that session runs `/usr/bin/start-hyprland`.
 
-Si ya instalaste paquetes y solo quieres copiar configuraciones:
+If packages are already installed and you only want to copy dotfiles:
 
 ```sh
 ./scripts/install.sh
 ```
 
-Si necesitas reconstruir `mpvpaper` en vez de usar el binario incluido:
+## Main Shortcuts
 
-```sh
-./scripts/build-mpvpaper.sh
+- `Super + H`: local keybinding help.
+- `Super + Enter`: terminal.
+- `Super + T`: terminal alias.
+- `Super + D`: application launcher.
+- `Super + E`: file manager.
+- `Super + B`: browser.
+- `Super + C`: editor.
+- `Super + Shift + W`: wallpaper picker.
+- `Super + Shift + .`: next wallpaper.
+- `Super + Shift + ,`: previous wallpaper.
+- `Super + Shift + T`: theme picker.
+- `Super + Shift + B`: restart Waybar.
+- `Super + Alt + arrows`: resize active window.
+- `Print`: region screenshot to clipboard.
+- Wallpaper key: wallpaper picker.
+- `Shift + wallpaper key`: next wallpaper.
+- `Ctrl + wallpaper key`: previous wallpaper.
+
+Most duplicate aliases were removed from the base config. `Super + T` remains as a terminal alias for the uConsole layout.
+
+## Date And Calendar
+
+Waybar shows date and time in the center:
+
+```text
+14 Jun  18:30
+```
+
+Hover the clock to see the monthly calendar tooltip. Click the clock to open a larger `yad` calendar window.
+
+Tooltip styling and the larger `yad` calendar font are kept in:
+
+```text
+config/waybar/style.css
+config/gtk-3.0/gtk.css
 ```
 
 ## Wallpapers
 
-Guarda imagenes en:
+Store wallpapers in either directory:
 
 ```text
 ~/.local/share/wallpapers
 ~/Pictures/Wallpapers
 ```
 
-El script usado es:
-
-```text
-~/.local/bin/uconsole-wallpaper
-```
-
-Formatos animados soportados:
+Supported animated formats:
 
 ```text
 .gif .mp4 .webm
 ```
 
-Los animados se aplican con `mpvpaper` como capa de fondo real; no deben aparecer como una ventana normal. Los `.gif` se convierten automaticamente a una copia cacheada en MP4 a 12 FPS para evitar CPU alta.
+The wallpaper script is:
 
-Puedes ajustar los FPS antes de aplicar un animado:
-
-```sh
-UCONSOLE_WALLPAPER_FPS=10 uconsole-wallpaper set ~/Pictures/Wallpapers/archivo.gif
+```text
+~/.local/bin/uconsole-wallpaper
 ```
 
-Por defecto los animados se limitan a un nucleo y 35% de CPU de ese nucleo:
+GIF files use `swww` automatically when available. Static images use `swaybg`. MP4/WEBM files and GIF fallback use `mpvpaper`.
+
+The first `swww` load of a large GIF can be slow. To avoid a black screen at boot, the script loads a persistent poster image first and then loads the optimized GIF in the background.
+
+Pre-optimize all GIF wallpapers:
 
 ```sh
-UCONSOLE_WALLPAPER_LIMIT=25 uconsole-wallpaper set ~/Pictures/Wallpapers/archivo.gif
+./scripts/optimize-wallpaper-gifs.sh
 ```
 
-## Temas
+This creates sidecar files next to each original GIF:
 
-Temas locales disponibles:
+```text
+name.swww.png
+name.swww.gif
+```
+
+The picker still shows only the original GIF. The sidecar files are hidden from the picker and used automatically when they are newer than the original.
+
+Useful environment overrides:
+
+```sh
+UCONSOLE_WALLPAPER_OPTIMIZED_GIFS=0 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
+UCONSOLE_WALLPAPER_FPS=10 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
+UCONSOLE_WALLPAPER_LIMIT=25 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
+UCONSOLE_WALLPAPER_BACKEND=swww uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
+UCONSOLE_WALLPAPER_BACKEND=mpvpaper uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
+```
+
+## Bundled Binaries
+
+The repo includes ARM64 binaries for convenience:
+
+```text
+bin/mpvpaper
+bin/mpvpaper-holder
+bin/swww
+bin/swww-daemon
+```
+
+Rebuild `mpvpaper` locally:
+
+```sh
+./scripts/build-mpvpaper.sh
+```
+
+Rebuild `swww` locally:
+
+```sh
+sudo apt install -y rustup liblz4-dev libwayland-dev libxkbcommon-dev pkg-config build-essential
+./scripts/build-swww.sh
+```
+
+Third-party notes are in `docs/THIRD_PARTY.md`.
+
+## Themes
+
+Available local themes:
 
 ```sh
 uconsole-theme list
@@ -103,30 +162,33 @@ uconsole-theme green
 uconsole-theme graphite
 ```
 
-Desde Hyprland:
+From Hyprland:
 
 ```text
 Super + Shift + T
 ```
 
-Esto cambia colores de Hyprland, Waybar, Wofi, Foot, Dunst y los OSD de brillo/volumen. Las terminales ya abiertas no cambian todos sus colores hasta abrir una nueva.
+The theme script updates Hyprland, Waybar, GTK tooltip/calendar styling, Wofi, Foot, Dunst, and the brightness/volume OSD files. Already-open terminals may need to be reopened to pick up all colors.
 
 ## Audio
 
-Las teclas de volumen usan `wpctl` sobre PipeWire. El atajo de subir volumen permite boost por software hasta 200%:
+Volume keys use PipeWire through `wpctl`. Volume up allows software boost up to 200%:
 
 ```text
 wpctl set-volume -l 2.0 @DEFAULT_AUDIO_SINK@ 5%+
 ```
 
-Sobre 100% el audio puede distorsionar, especialmente en los parlantes pequenos de la uConsole. El rango alto queda disponible para fuentes con volumen original muy bajo.
+Audio above 100% can distort, especially on the built-in uConsole speakers. The extra range is mainly useful for quiet sources.
 
-## Notas
+## Notes
 
-No es HyDE completo. Es un port pequeno inspirado en HyDE y adaptado a Debian/uConsole. Evita ejecutar instaladores grandes de dotfiles sin revisar, porque pueden pisar:
+This is not a full HyDE install. It is a small Debian/uConsole-focused Hyprland setup inspired by HyDE styling, without Arch-only HyDE scripts.
+
+Review large third-party dotfile installers before running them, because they can overwrite:
 
 - `~/.config/hypr`
 - `~/.config/waybar`
+- `~/.config/gtk-3.0`
 - `~/.config/dunst`
 - `~/.local/bin/uconsole-*`
 - `/etc/keyd/default.conf`

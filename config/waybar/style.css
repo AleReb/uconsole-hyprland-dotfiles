@@ -10,6 +10,17 @@ window#waybar {
   color: #f8fafc;
 }
 
+tooltip {
+  background: rgba(31, 35, 40, 0.96);
+  border: 1px solid #c79bf0;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+tooltip label {
+  color: #f8fafc;
+}
+
 #workspaces,
 #clock,
 #custom-cpu,

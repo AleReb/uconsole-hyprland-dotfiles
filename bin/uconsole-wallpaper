@@ -1,16 +1,25 @@
 #!/bin/sh
 set -eu
 
+PATH="$HOME/.local/bin:$PATH"
+
 state_dir="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole"
 state_file="$state_dir/wallpaper"
 config="$HOME/.config/hypr/hyprpaper.conf"
 swaybg_pid="$state_dir/swaybg.pid"
+log_file="$state_dir/wallpaper.log"
 wall_dirs="$HOME/.local/share/wallpapers $HOME/Pictures/Wallpapers /usr/share/hypr"
 animated_fps="${UCONSOLE_WALLPAPER_FPS:-12}"
 animated_cpu="${UCONSOLE_WALLPAPER_CPU:-3}"
 animated_limit="${UCONSOLE_WALLPAPER_LIMIT:-35}"
+wallpaper_backend="${UCONSOLE_WALLPAPER_BACKEND:-auto}"
+use_optimized_gifs="${UCONSOLE_WALLPAPER_OPTIMIZED_GIFS:-1}"
 
 mkdir -p "$state_dir"
+
+log_msg() {
+    printf '%s %s\n' "$(date '+%F %T')" "$*" >> "$log_file" 2>/dev/null || true
+}
 
 list_wallpapers() {
     for dir in $wall_dirs; do
@@ -18,7 +27,7 @@ list_wallpapers() {
         if [ "$dir" = "/usr/share/hypr" ]; then
             find "$dir" -maxdepth 1 -type f -iname 'wall*.png'
         else
-            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.gif' -o -iname '*.mp4' -o -iname '*.webm' \)
+            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o \( -iname '*.png' ! -iname '*.swww.png' \) -o -iname '*.webp' -o \( -iname '*.gif' ! -iname '*.swww.gif' \) -o -iname '*.mp4' -o -iname '*.webm' \)
         fi
     done | sort -u
 }
@@ -35,6 +44,53 @@ is_gif_wallpaper() {
         *.[Gg][Ii][Ff]) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+optimized_gif_file() {
+    img="$1"
+    [ "$use_optimized_gifs" = "1" ] || {
+        printf '%s\n' "$img"
+        return 0
+    }
+
+    case "$img" in
+        *.swww.gif|*.SWWW.gif)
+            printf '%s\n' "$img"
+            return 0
+            ;;
+    esac
+
+    dir="$(dirname "$img")"
+    base="$(basename "$img" .gif)"
+    case "$base" in
+        *.GIF) base="$(basename "$img" .GIF)" ;;
+    esac
+    optimized="$dir/$base.swww.gif"
+
+    if [ -f "$optimized" ] && [ "$optimized" -nt "$img" ]; then
+        printf '%s\n' "$optimized"
+    else
+        printf '%s\n' "$img"
+    fi
+}
+
+optimized_gif_poster_file() {
+    img="$1"
+    [ "$use_optimized_gifs" = "1" ] || return 1
+
+    case "$img" in
+        *.swww.gif|*.SWWW.gif) poster="${img%.[Gg][Ii][Ff]}.png" ;;
+        *)
+            dir="$(dirname "$img")"
+            base="$(basename "$img" .gif)"
+            case "$base" in
+                *.GIF) base="$(basename "$img" .GIF)" ;;
+            esac
+            poster="$dir/$base.swww.png"
+            ;;
+    esac
+
+    [ -f "$poster" ] && [ "$poster" -nt "$img" ] && printf '%s\n' "$poster"
 }
 
 animated_playback_file() {
@@ -58,7 +114,7 @@ animated_playback_file() {
     fi
 }
 
-stop_wallpaper_processes() {
+stop_legacy_wallpaper_processes() {
     if [ -s "$swaybg_pid" ]; then
         kill "$(cat "$swaybg_pid")" >/dev/null 2>&1 || true
     fi
@@ -70,6 +126,126 @@ stop_wallpaper_processes() {
         kill "$pid" >/dev/null 2>&1 || true
     done
     rm -f "$swaybg_pid"
+}
+
+stop_swww_img_loaders() {
+    pgrep -a swww 2>/dev/null | awk '/ swww img / { print $1 }' | while read -r pid; do
+        kill "$pid" >/dev/null 2>&1 || true
+    done
+}
+
+stop_wallpaper_processes() {
+    stop_legacy_wallpaper_processes
+    stop_swww_img_loaders
+    if command -v swww >/dev/null 2>&1; then
+        swww kill >/dev/null 2>&1 || true
+    fi
+}
+
+start_swww_background_load() {
+    img="$1"
+    delay="$2"
+    unit_suffix="$(printf '%s' "$img-$delay" | cksum | awk '{ print $1 }')"
+    unit="uconsole-wallpaper-$unit_suffix"
+    loader='
+        delay="$1"
+        img="$2"
+        log="$3"
+        sleep "$delay"
+        current="$(swww query 2>/dev/null || true)"
+        case "$current" in
+            *"$img"*) exit 0 ;;
+        esac
+        for attempt in 1 2 3; do
+            if swww img "$img" --resize crop --transition-type none >/dev/null 2>&1; then
+                printf "%s swww loaded %s\n" "$(date "+%F %T")" "$img" >> "$log" 2>/dev/null || true
+                pkill -x hyprpaper >/dev/null 2>&1 || true
+                pkill -x swaybg >/dev/null 2>&1 || true
+                pkill -x mpvpaper >/dev/null 2>&1 || true
+                pkill -x cpulimit >/dev/null 2>&1 || true
+                exit 0
+            fi
+            printf "%s swww background load failed attempt=%s file=%s\n" "$(date "+%F %T")" "$attempt" "$img" >> "$log" 2>/dev/null || true
+            sleep 5
+        done
+        exit 1
+    '
+
+    if command -v systemd-run >/dev/null 2>&1; then
+        systemd-run --user --collect --quiet --unit="$unit" \
+            --setenv=WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" \
+            --setenv=XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}" \
+            --setenv=PATH="$PATH" \
+            /bin/sh -c "$loader" sh "$delay" "$img" "$log_file" >/dev/null 2>&1 && return 0
+    fi
+
+    setsid -f sh -c "$loader" sh "$delay" "$img" "$log_file"
+}
+
+swww_available() {
+    command -v swww >/dev/null 2>&1
+}
+
+use_swww_for() {
+    img="$1"
+
+    case "$wallpaper_backend" in
+        swww) swww_available ;;
+        mpvpaper|swaybg) return 1 ;;
+        auto)
+            is_gif_wallpaper "$img" && swww_available
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+apply_swww_wallpaper() {
+    img="$1"
+    display_img="$img"
+    poster_img=""
+    if is_gif_wallpaper "$img"; then
+        display_img="$(optimized_gif_file "$img")"
+        poster_img="$(optimized_gif_poster_file "$img" 2>/dev/null || true)"
+    fi
+
+    if ! swww query >/dev/null 2>&1; then
+        setsid -f swww-daemon -q >/dev/null 2>&1
+        ready=0
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            sleep 0.5
+            if swww query >/dev/null 2>&1; then
+                ready=1
+                break
+            fi
+        done
+        [ "$ready" -eq 1 ] || {
+            log_msg "swww daemon did not become ready"
+            notify-send "Wallpaper" "swww could not start; using fallback if available." >/dev/null 2>&1 || true
+            return 1
+        }
+    fi
+
+    if [ -n "$poster_img" ]; then
+        swww img "$poster_img" --resize crop --transition-type none >/dev/null 2>&1 || true
+        stop_swww_img_loaders
+        start_swww_background_load "$display_img" 0
+        start_swww_background_load "$display_img" 20
+        log_msg "swww poster loaded $poster_img; background loading $display_img"
+        return 0
+    fi
+
+    stop_swww_img_loaders
+    for attempt in 1 2; do
+        if swww img "$display_img" --resize crop --transition-type none >/dev/null 2>&1; then
+            log_msg "swww loaded $display_img"
+            return 0
+        fi
+        log_msg "swww img failed attempt=$attempt file=$display_img"
+        sleep 1
+    done
+    return 1
 }
 
 set_wallpaper() {
@@ -94,11 +270,18 @@ apply_wallpaper() {
     [ -f "$img" ] || img="$HOME/.local/share/wallpapers/wall1.png"
     [ -f "$img" ] || exit 1
 
+    if use_swww_for "$img"; then
+        if apply_swww_wallpaper "$img"; then
+            stop_legacy_wallpaper_processes
+            return 0
+        fi
+    fi
+
     stop_wallpaper_processes
 
     if is_animated_wallpaper "$img"; then
         command -v mpvpaper >/dev/null 2>&1 || {
-            notify-send "Wallpaper" "mpvpaper no esta instalado; no puedo animar GIF/video." >/dev/null 2>&1 || true
+            notify-send "Wallpaper" "mpvpaper is not installed; GIF/video animation is unavailable." >/dev/null 2>&1 || true
             exit 1
         }
 

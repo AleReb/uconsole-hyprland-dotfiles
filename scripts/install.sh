@@ -17,7 +17,7 @@ need_cmd mkdir
 
 mkdir -p "$BACKUP"
 
-for dir in hypr waybar wofi foot dunst uconsole; do
+for dir in hypr waybar wofi foot dunst uconsole gtk-3.0; do
     if [ -e "$HOME/.config/$dir" ]; then
         cp -a "$HOME/.config/$dir" "$BACKUP/"
     fi
@@ -47,15 +47,18 @@ cp -a "$ROOT/config/wofi" "$HOME/.config/"
 cp -a "$ROOT/config/foot" "$HOME/.config/"
 cp -a "$ROOT/config/dunst" "$HOME/.config/"
 cp -a "$ROOT/config/uconsole" "$HOME/.config/"
+cp -a "$ROOT/config/gtk-3.0" "$HOME/.config/"
 cp -a "$ROOT/config/brightness_osd.sh" "$HOME/.config/"
 cp -a "$ROOT/config/volume_osd.sh" "$HOME/.config/"
 chmod +x "$HOME/.config/brightness_osd.sh" "$HOME/.config/volume_osd.sh"
 cp -a "$ROOT/bin"/uconsole-* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin"/uconsole-*
-if [ -f "$ROOT/bin/mpvpaper" ]; then
-    cp -a "$ROOT/bin/mpvpaper" "$ROOT/bin/mpvpaper-holder" "$HOME/.local/bin/"
-    chmod +x "$HOME/.local/bin/mpvpaper" "$HOME/.local/bin/mpvpaper-holder"
-fi
+for file in mpvpaper mpvpaper-holder swww swww-daemon; do
+    if [ -f "$ROOT/bin/$file" ]; then
+        cp -a "$ROOT/bin/$file" "$HOME/.local/bin/"
+        chmod +x "$HOME/.local/bin/$file"
+    fi
+done
 
 if [ -f "$ROOT/keyd/default.conf" ]; then
     sudo install -m 0644 "$ROOT/keyd/default.conf" /etc/keyd/default.conf
@@ -79,4 +82,4 @@ EOF
 fi
 
 printf 'Installed. Backup: %s\n' "$BACKUP"
-printf 'Choose Hyprland (uwsm-managed) from LightDM when available.\n'
+printf 'Choose the Hyprland session from LightDM, or use LightDM autologin for direct boot.\n'

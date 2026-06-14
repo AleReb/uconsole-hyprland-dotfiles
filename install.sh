@@ -10,4 +10,4 @@ printf 'You may be asked for sudo.\n\n'
 "$ROOT/scripts/packages-debian.sh"
 "$ROOT/scripts/install.sh"
 
-printf '\nDone. Log out and choose Hyprland (uwsm-managed) from LightDM.\n'
+printf '\nDone. Log out and choose the Hyprland session from LightDM.\n'

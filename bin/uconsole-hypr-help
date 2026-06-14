@@ -1,88 +1,89 @@
 #!/bin/sh
 exec foot --title "Hyprland keybinds" sh -c 'LESS="-R --use-color -M" less <<'"'"'EOF'"'"'
-Hyprland uConsole - Atajos
+Hyprland uConsole - Keybindings
 
-Super = la tecla que remapeamos desde KEY_OPEN
+Super = the key remapped from KEY_OPEN
 
-Aplicaciones
+Applications
   Super + Enter        Terminal
   Super + T            Terminal
-  Super + A / D        Lanzador de apps
-  Super + E            Archivos
+  Super + D            Application launcher
+  Super + E            File manager
   Super + C            Editor
-  Super + B            Navegador
-  Super + H            Esta ayuda
-  Super + Shift + B    Reiniciar barra superior
-  Super + Shift + C    CAVA, barras de audio
-  Super + Shift + T    Selector de tema
+  Super + B            Browser
+  Super + H            This help screen
+  Super + Shift + B    Restart top bar
+  Super + Shift + C    CAVA audio bars
+  Super + Shift + T    Theme picker
 
-Ventanas
-  Ctrl + Q             Cerrar ventana
-  Alt + F4             Cerrar ventana
-  Super + Shift + Q    Cerrar ventana
-  Super + Tab          Cambiar a la siguiente ventana
-  Alt + Tab            Cambiar foco
-  Super + F            Pantalla completa
-  Shift + F11          Pantalla completa
-  Super + W            Flotante / mosaico
-  Super + Space        Flotante / mosaico
-  Super + G            Agrupar ventana
-  Super + J            Cambiar orientacion del split
+Windows
+  Ctrl + Q             Close active window
+  Alt + F4             Close active window
+  Super + Shift + Q    Close active window
+  Super + Tab          Cycle to next window and raise it
+  Alt + Tab            Cycle focus
+  Super + F            Fullscreen
+  Shift + F11          Fullscreen
+  Super + Space        Floating / tiled
+  Super + G            Toggle window group
+  Super + J            Toggle split orientation
   Super + Shift + P    Pseudo-tile
 
-Mover foco y ventanas
-  Super + Flechas              Mover foco
-  Super + Shift + Flechas      Mover ventana
-  Super + Alt + Flechas        Cambiar tamano
-  Super + mouse izquierdo      Mover ventana
-  Super + mouse derecho        Cambiar tamano
-  Super + Z                    Mover ventana arrastrando
-  Super + X                    Cambiar tamano arrastrando
+Focus and window movement
+  Super + Arrows              Move focus
+  Super + Shift + Arrows      Move window
+  Super + Alt + Arrows        Resize window
+  Super + left mouse          Move window
+  Super + right mouse         Resize window
+  Super + Z                   Drag-move window
+  Super + X                   Drag-resize window
 
 Workspaces
-  Super + 1..9 / 0             Ir a workspace 1..10
-  Super + Shift + 1..9 / 0     Mandar ventana a workspace 1..10
-  Super + Ctrl + Derecha       Siguiente workspace
-  Super + Ctrl + Izquierda     Workspace anterior
-  Super + Ctrl + Abajo         Workspace vacio
-  Ctrl + Izquierda/Derecha     Workspace anterior/siguiente existente
+  Super + 1..9 / 0             Go to workspace 1..10
+  Super + Shift + 1..9 / 0     Move window to workspace 1..10
+  Super + Ctrl + Right         Next workspace
+  Super + Ctrl + Left          Previous workspace
+  Super + Ctrl + Down          Empty workspace
+  Ctrl + Left/Right            Previous/next existing workspace
 
 Wallpapers
-  Super + Shift + W    Elegir wallpaper
-  Super + Shift + .    Wallpaper siguiente
-  Super + Shift + ,    Wallpaper anterior
-  Tecla wallpaper      Elegir wallpaper
-  Shift + tecla wallpaper Wallpaper siguiente
-  Ctrl + tecla wallpaper  Wallpaper anterior
+  Super + Shift + W    Pick wallpaper
+  Super + Shift + .    Next wallpaper
+  Super + Shift + ,    Previous wallpaper
+  Wallpaper key        Pick wallpaper
+  Shift + wallpaper key Next wallpaper
+  Ctrl + wallpaper key  Previous wallpaper
 
-Guarda wallpapers en:
+Store wallpapers in:
   ~/.local/share/wallpapers
   ~/Pictures/Wallpapers
 
 Scratchpad
-  Super + S            Mostrar/ocultar scratchpad
-  Super + Shift + S    Mandar ventana al scratchpad
+  Super + S            Show/hide scratchpad
+  Super + Shift + S    Move window to scratchpad
 
-El scratchpad es un workspace oculto. Manda ahi una ventana con
-Super+Shift+S y la traes o escondes con Super+S.
+The scratchpad is a hidden workspace. Move a window there with
+Super+Shift+S and show or hide it with Super+S.
 
 Hardware
-  Teclas volumen       Subir/bajar/mute
-  Teclas brillo        Subir/bajar brillo
-  Print                Captura region al portapapeles
-  Super + P            Captura region al portapapeles
-  XF86 media           Play/next/prev
+  Volume keys          Volume down/up/mute
+  Brightness keys      Brightness down/up
+  Print                Region screenshot to clipboard
+  XF86 media           Play/next/previous
 
-Sistema
-  Super + Shift + R    Recargar Hyprland
-  Super + Shift + E    Salir de Hyprland
-  Super + Delete       Salir de Hyprland
+System
+  Super + Shift + R    Reload Hyprland
+  Super + Shift + E    Exit Hyprland
+  Super + Delete       Exit Hyprland
 
-Navegacion de esta ayuda
-  Flechas / rueda      Desplazar
-  PageUp / PageDown    Desplazar por pagina
-  Home / End           Inicio / final
-  /texto               Buscar
-  q                    Cerrar
+Notes
+  Super + T is kept as a terminal alias for the uConsole layout.
+
+Help navigation
+  Arrows / wheel       Scroll
+  PageUp / PageDown    Page scroll
+  Home / End           Start / end
+  /text                Search
+  q                    Close
 EOF
 '

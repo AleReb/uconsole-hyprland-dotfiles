@@ -75,6 +75,17 @@ window#waybar {
   color: #${fg};
 }
 
+tooltip {
+  background: rgba(${panel}, 0.96);
+  border: 1px solid #${accent2};
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+tooltip label {
+  color: #${fg};
+}
+
 #workspaces,
 #clock,
 #custom-cpu,
@@ -119,6 +130,30 @@ window#waybar {
 #battery.critical,
 #temperature.critical {
   color: #${crit};
+}
+EOF
+
+    mkdir -p "$HOME/.config/gtk-3.0"
+    cat > "$HOME/.config/gtk-3.0/gtk.css" <<EOF
+tooltip, .tooltip {
+  background-color: rgba(${panel}, 0.96);
+  color: #${fg};
+  border: 1px solid #${accent2};
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+tooltip label, .tooltip label {
+  color: #${fg};
+}
+
+#yad-calendar-widget,
+#yad-calendar-widget * {
+  font-size: 20px;
+}
+
+#yad-calendar-widget {
+  padding: 14px;
 }
 EOF
 
