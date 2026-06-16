@@ -96,6 +96,10 @@ build-essential
   - alone: `Super+Shift+W`
   - with Shift: `Super+Shift+.`
   - with Ctrl: `Super+Shift+,`
+- Local keyboard note: the live system was tested with two extra `keyd` mappings that are not part of the portable base profile:
+  - `leftmeta = playpause`
+  - `pagedown = leftmeta`
+  Keep them as a local preference unless this exact keyboard behavior is desired on a fresh install.
 - Shortcut policy: keep only useful aliases in the base Hyprland config. `Super + T` remains as a terminal alias for the uConsole layout; other actions should stay on a single standard shortcut unless a hardware key needs a dedicated macro.
 - Fastfetch: `.bashrc` uses `${XDG_RUNTIME_DIR}/uconsole-fastfetch-shown` to show compact system info only once per graphical login session.
 
