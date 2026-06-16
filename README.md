@@ -14,7 +14,7 @@ Portable Debian 13 / Raspberry Pi CM5 Hyprland setup for the ClockworkPi uConsol
 - Static wallpapers through `swaybg`.
 - Animated GIF wallpapers through the bundled ARM64 `swww` binaries.
 - Persistent GIF optimization helpers for faster boot wallpaper loading.
-- Lightweight Hyprland launch wrappers that avoid HDMI/DRM auto-probing loops.
+- Lightweight Hyprland launch wrappers that select HDMI or DSI once at startup.
 - PipeWire volume keys with optional software boost up to 200%.
 - Compact `fastfetch` once per graphical login session.
 
@@ -37,7 +37,7 @@ This profile installs two local launch wrappers:
 ~/.local/bin/Hyprland
 ```
 
-`~/.local/bin/start-hyprland` delegates to `/usr/bin/start-hyprland` with `--path ~/.local/bin/Hyprland`, and `~/.local/bin/Hyprland` delegates directly to `/usr/bin/Hyprland`. Keep these wrappers minimal. Do not add `AQ_DRM_DEVICES`, `DRI_PRIME`, `WLR_RENDER_DRM_DEVICE`, HDMI hotplug polling, or generated monitor config to the launcher path; that caused high CPU on this uConsole profile.
+`~/.local/bin/start-hyprland` delegates to `/usr/bin/start-hyprland` with `--path ~/.local/bin/Hyprland`. `~/.local/bin/Hyprland` detects HDMI at startup, writes `~/.cache/hypr/uconsole-monitors.conf`, and sets `AQ_DRM_DEVICES` only for the selected output card. Keep this wrapper startup-only: do not add HDMI hotplug polling, restart loops, `DRI_PRIME`, or `WLR_RENDER_DRM_DEVICE`; those paths caused high CPU on this uConsole profile.
 
 If packages are already installed and you only want to copy dotfiles:
 

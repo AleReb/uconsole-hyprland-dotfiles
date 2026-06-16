@@ -1,2 +1,70 @@
 #!/bin/sh
+# uConsole CM5: DSI and HDMI are exposed as separate DRM cards. Hyprland's
+# live multi-GPU path can detect both but fail to render HDMI, so choose one
+# output path at startup.
+card_from_connector() {
+    for connector in "$@"; do
+        [ -e "$connector" ] || continue
+        card=${connector##*/}
+        card=${card%%-*}
+        [ -e "/dev/dri/$card" ] && {
+            printf '%s\n' "/dev/dri/$card"
+            return 0
+        }
+    done
+    return 1
+}
+
+connected_connector() {
+    for connector in "$@"; do
+        [ -e "$connector/status" ] || continue
+        [ "$(cat "$connector/status" 2>/dev/null)" = connected ] && {
+            printf '%s\n' "$connector"
+            return 0
+        }
+    done
+    return 1
+}
+
+dsi_card=$(card_from_connector /sys/class/drm/card*-DSI-* || true)
+hdmi_card=$(card_from_connector /sys/class/drm/card*-HDMI-* /sys/class/drm/card*-HDMI-A-* || true)
+hdmi_connector=$(connected_connector /sys/class/drm/card*-HDMI-A-* /sys/class/drm/card*-HDMI-* || true)
+
+monitor_conf="${XDG_CACHE_HOME:-$HOME/.cache}/hypr/uconsole-monitors.conf"
+mkdir -p "${monitor_conf%/*}"
+
+if [ -n "$hdmi_connector" ] && [ -n "$hdmi_card" ]; then
+    export AQ_DRM_DEVICES="$hdmi_card"
+    monitor_mode=hdmi
+    cat >"$monitor_conf" <<'EOF'
+monitor = HDMI-A-1,preferred,0x0,1
+monitor = HDMI-A-2,preferred,0x0,1
+monitor = DSI-2,disable
+monitor = DSI-1,disable
+monitor = ,preferred,auto,1
+EOF
+elif [ -n "$dsi_card" ]; then
+    export AQ_DRM_DEVICES="$dsi_card"
+    monitor_mode=dsi
+    cat >"$monitor_conf" <<'EOF'
+monitor = DSI-2,preferred,0x0,1.07,transform,3
+monitor = DSI-1,preferred,0x0,1.07,transform,3
+monitor = HDMI-A-1,disable
+monitor = HDMI-A-2,disable
+monitor = ,preferred,auto,1
+EOF
+else
+    monitor_mode=auto
+    cat >"$monitor_conf" <<'EOF'
+monitor = ,preferred,auto,1
+EOF
+fi
+
+{
+    printf 'AQ_DRM_DEVICES=%s\n' "${AQ_DRM_DEVICES:-unset}"
+    printf 'MONITOR_MODE=%s\n' "$monitor_mode"
+    printf 'MONITOR_CONF=%s\n' "$monitor_conf"
+    printf 'HDMI_CONNECTOR=%s\n' "${hdmi_connector:-none}"
+} >"${XDG_RUNTIME_DIR:-/tmp}/uconsole-hyprland-wrapper.log"
+
 exec /usr/bin/Hyprland "$@"
