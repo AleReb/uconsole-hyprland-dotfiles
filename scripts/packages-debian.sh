@@ -3,7 +3,7 @@ set -eu
 
 sudo apt update
 sudo apt install -y \
-    git waybar wofi foot swaybg keyd cava fastfetch ffmpeg mpv libmpv2 cpulimit \
+    git waybar wofi foot swaybg keyd cava fastfetch ffmpeg \
     yad liblz4-1 libxxhash0 \
     wl-clipboard playerctl pavucontrol network-manager-gnome wev
 

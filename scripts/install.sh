@@ -53,7 +53,7 @@ cp -a "$ROOT/config/volume_osd.sh" "$HOME/.config/"
 chmod +x "$HOME/.config/brightness_osd.sh" "$HOME/.config/volume_osd.sh"
 cp -a "$ROOT/bin"/uconsole-* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin"/uconsole-*
-for file in mpvpaper mpvpaper-holder swww swww-daemon; do
+for file in swww swww-daemon; do
     if [ -f "$ROOT/bin/$file" ]; then
         cp -a "$ROOT/bin/$file" "$HOME/.local/bin/"
         chmod +x "$HOME/.local/bin/$file"

@@ -29,10 +29,7 @@ pavucontrol
 network-manager-gnome
 yad
 wev
-mpv
-libmpv2
 ffmpeg
-cpulimit
 liblz4-1
 libxxhash0
 pipewire
@@ -77,10 +74,9 @@ build-essential
 
 - Active state observed on 2026-06-14: the live desktop may have a generated theme and selected wallpaper. Those values are user state created by `uconsole-theme` and `uconsole-wallpaper`; the repo keeps portable defaults.
 - Graphical login: systemd should use `graphical.target`, LightDM should be enabled, and `/etc/lightdm/lightdm.conf` can use `autologin-user=uconsole`, `user-session=hyprland`, and `autologin-session=hyprland` for direct boot into the session that calls `/usr/bin/start-hyprland`.
-- Wallpapers: static images use `swaybg`; GIF uses `swww` when available; MP4/WEBM and fallback GIF playback use `mpvpaper`.
+- Wallpapers: static images use `swaybg`; GIF uses `swww`. Video wallpapers are intentionally unsupported on this device profile.
 - `swww` was built locally from `~/src/swww` with stable Rust and installed as `~/.local/bin/swww` plus `~/.local/bin/swww-daemon`. The repo also includes those ARM64 binaries under `bin/`.
 - GIF optimization: `scripts/optimize-wallpaper-gifs.sh` creates persistent `*.swww.png` posters and `*.swww.gif` optimized copies when they are smaller than the original. `uconsole-wallpaper` keeps state pointing at the original GIF, loads the poster first to avoid a black boot screen, and then loads the optimized GIF in the background. The picker hides generated sidecars.
-- Fallback animated wallpaper playback: GIF fallback is cached as MP4 at 12 FPS with `ffmpeg`. `mpvpaper` is run with `taskset` and `cpulimit` to reduce CPU pressure.
 - Avoid `hyprpaper` for this device state. Testing showed `hyprctl hyprpaper wallpaper` could hang and create high CPU load.
 - uConsole display scale: DSI output uses scale `1.07`, cursor size 28, and slightly larger Waybar/Foot/Wofi sizing.
 - Theme management: `uconsole-theme` updates Hyprland, Waybar, GTK tooltip/calendar styling, Wofi, Foot, Dunst, and OSD colors.
@@ -120,12 +116,6 @@ Copy only dotfiles and bundled local binaries:
 
 ```sh
 ./scripts/install.sh
-```
-
-Rebuild `mpvpaper`:
-
-```sh
-./scripts/build-mpvpaper.sh
 ```
 
 Rebuild `swww`:

@@ -9,10 +9,7 @@ config="$HOME/.config/hypr/hyprpaper.conf"
 swaybg_pid="$state_dir/swaybg.pid"
 log_file="$state_dir/wallpaper.log"
 wall_dirs="$HOME/.local/share/wallpapers $HOME/Pictures/Wallpapers /usr/share/hypr"
-animated_fps="${UCONSOLE_WALLPAPER_FPS:-12}"
-animated_cpu="${UCONSOLE_WALLPAPER_CPU:-3}"
-animated_limit="${UCONSOLE_WALLPAPER_LIMIT:-35}"
-wallpaper_backend="${UCONSOLE_WALLPAPER_BACKEND:-auto}"
+wallpaper_backend="${UCONSOLE_WALLPAPER_BACKEND:-swww}"
 use_optimized_gifs="${UCONSOLE_WALLPAPER_OPTIMIZED_GIFS:-1}"
 
 mkdir -p "$state_dir"
@@ -27,14 +24,14 @@ list_wallpapers() {
         if [ "$dir" = "/usr/share/hypr" ]; then
             find "$dir" -maxdepth 1 -type f -iname 'wall*.png'
         else
-            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o \( -iname '*.png' ! -iname '*.swww.png' \) -o -iname '*.webp' -o \( -iname '*.gif' ! -iname '*.swww.gif' \) -o -iname '*.mp4' -o -iname '*.webm' \)
+            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o \( -iname '*.png' ! -iname '*.swww.png' \) -o -iname '*.webp' -o \( -iname '*.gif' ! -iname '*.swww.gif' \) \)
         fi
     done | sort -u
 }
 
 is_animated_wallpaper() {
     case "$1" in
-        *.[Gg][Ii][Ff]|*.[Mm][Pp]4|*.[Ww][Ee][Bb][Mm]) return 0 ;;
+        *.[Gg][Ii][Ff]) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -93,38 +90,12 @@ optimized_gif_poster_file() {
     [ -f "$poster" ] && [ "$poster" -nt "$img" ] && printf '%s\n' "$poster"
 }
 
-animated_playback_file() {
-    img="$1"
-
-    if is_gif_wallpaper "$img" && command -v ffmpeg >/dev/null 2>&1; then
-        key="$(printf '%s' "$img" | cksum | awk '{ print $1 }')"
-        cache="$state_dir/wallpaper-$key-${animated_fps}fps.mp4"
-
-        if [ ! -f "$cache" ] || [ "$img" -nt "$cache" ]; then
-            notify-send "Wallpaper" "Optimizando GIF a ${animated_fps} FPS..." >/dev/null 2>&1 || true
-            ffmpeg -y -i "$img" \
-                -vf "fps=${animated_fps},scale='min(1280,iw)':-2:flags=lanczos" \
-                -an -c:v libx264 -preset veryfast -crf 30 -pix_fmt yuv420p -movflags +faststart \
-                "$cache" >/dev/null 2>&1
-        fi
-
-        printf '%s\n' "$cache"
-    else
-        printf '%s\n' "$img"
-    fi
-}
-
 stop_legacy_wallpaper_processes() {
     if [ -s "$swaybg_pid" ]; then
         kill "$(cat "$swaybg_pid")" >/dev/null 2>&1 || true
     fi
     pkill -x hyprpaper >/dev/null 2>&1 || true
     pkill -x swaybg >/dev/null 2>&1 || true
-    pkill -x mpvpaper >/dev/null 2>&1 || true
-    pkill -x cpulimit >/dev/null 2>&1 || true
-    pgrep -a mpv 2>/dev/null | awk '/uconsole-animated-wallpaper/ { print $1 }' | while read -r pid; do
-        kill "$pid" >/dev/null 2>&1 || true
-    done
     rm -f "$swaybg_pid"
 }
 
@@ -161,8 +132,6 @@ start_swww_background_load() {
                 printf "%s swww loaded %s\n" "$(date "+%F %T")" "$img" >> "$log" 2>/dev/null || true
                 pkill -x hyprpaper >/dev/null 2>&1 || true
                 pkill -x swaybg >/dev/null 2>&1 || true
-                pkill -x mpvpaper >/dev/null 2>&1 || true
-                pkill -x cpulimit >/dev/null 2>&1 || true
                 exit 0
             fi
             printf "%s swww background load failed attempt=%s file=%s\n" "$(date "+%F %T")" "$attempt" "$img" >> "$log" 2>/dev/null || true
@@ -190,11 +159,10 @@ use_swww_for() {
     img="$1"
 
     case "$wallpaper_backend" in
-        swww) swww_available ;;
-        mpvpaper|swaybg) return 1 ;;
-        auto)
+        swww|auto)
             is_gif_wallpaper "$img" && swww_available
             ;;
+        swaybg) return 1 ;;
         *)
             return 1
             ;;
@@ -277,26 +245,15 @@ apply_wallpaper() {
         fi
     fi
 
+    if is_gif_wallpaper "$img"; then
+        notify-send "Wallpaper" "swww is required for GIF wallpapers." >/dev/null 2>&1 || true
+        exit 1
+    fi
+
     stop_wallpaper_processes
 
-    if is_animated_wallpaper "$img"; then
-        command -v mpvpaper >/dev/null 2>&1 || {
-            notify-send "Wallpaper" "mpvpaper is not installed; GIF/video animation is unavailable." >/dev/null 2>&1 || true
-            exit 1
-        }
-
-        play_file="$(animated_playback_file "$img")"
-        if command -v cpulimit >/dev/null 2>&1 && command -v taskset >/dev/null 2>&1; then
-            cpulimit -f -m -l "$animated_limit" -- nice -n 15 taskset -c "$animated_cpu" mpvpaper -o "no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings vf=fps=${animated_fps}" ALL "$play_file" >/dev/null 2>&1 &
-        elif command -v taskset >/dev/null 2>&1; then
-            nice -n 15 taskset -c "$animated_cpu" mpvpaper -f -o "no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings vf=fps=${animated_fps}" ALL "$play_file" >/dev/null 2>&1
-        else
-            nice -n 15 mpvpaper -f -o "no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings vf=fps=${animated_fps}" ALL "$play_file" >/dev/null 2>&1
-        fi
-    else
-        swaybg -m fill -i "$img" >/dev/null 2>&1 &
-        printf '%s\n' "$!" > "$swaybg_pid"
-    fi
+    swaybg -m fill -i "$img" >/dev/null 2>&1 &
+    printf '%s\n' "$!" > "$swaybg_pid"
 }
 
 pick_wallpaper() {

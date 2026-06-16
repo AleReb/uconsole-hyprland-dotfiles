@@ -12,7 +12,7 @@ Portable Debian 13 / Raspberry Pi CM5 Hyprland setup for the ClockworkPi uConsol
   - `open = leftmeta`, used as `Super`.
   - `unknown` as a dedicated wallpaper key.
 - Static wallpapers through `swaybg`.
-- Animated GIF wallpapers through the bundled ARM64 `swww` binaries, with `mpvpaper` fallback for GIF/video.
+- Animated GIF wallpapers through the bundled ARM64 `swww` binaries.
 - Persistent GIF optimization helpers for faster boot wallpaper loading.
 - PipeWire volume keys with optional software boost up to 200%.
 - Compact `fastfetch` once per graphical login session.
@@ -86,7 +86,7 @@ Store wallpapers in either directory:
 Supported animated formats:
 
 ```text
-.gif .mp4 .webm
+.gif
 ```
 
 The wallpaper script is:
@@ -95,7 +95,7 @@ The wallpaper script is:
 ~/.local/bin/uconsole-wallpaper
 ```
 
-GIF files use `swww` automatically when available. Static images use `swaybg`. MP4/WEBM files and GIF fallback use `mpvpaper`.
+GIF files use `swww` automatically. Static images use `swaybg`. Video wallpapers are intentionally unsupported on this device profile.
 
 The first `swww` load of a large GIF can be slow. To avoid a black screen at boot, the script loads a persistent poster image first and then loads the optimized GIF in the background.
 
@@ -118,10 +118,7 @@ Useful environment overrides:
 
 ```sh
 UCONSOLE_WALLPAPER_OPTIMIZED_GIFS=0 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
-UCONSOLE_WALLPAPER_FPS=10 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
-UCONSOLE_WALLPAPER_LIMIT=25 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
 UCONSOLE_WALLPAPER_BACKEND=swww uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
-UCONSOLE_WALLPAPER_BACKEND=mpvpaper uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
 ```
 
 ## Bundled Binaries
@@ -129,16 +126,8 @@ UCONSOLE_WALLPAPER_BACKEND=mpvpaper uconsole-wallpaper set ~/Pictures/Wallpapers
 The repo includes ARM64 binaries for convenience:
 
 ```text
-bin/mpvpaper
-bin/mpvpaper-holder
 bin/swww
 bin/swww-daemon
-```
-
-Rebuild `mpvpaper` locally:
-
-```sh
-./scripts/build-mpvpaper.sh
 ```
 
 Rebuild `swww` locally:
