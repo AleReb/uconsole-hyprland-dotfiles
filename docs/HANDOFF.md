@@ -4,7 +4,7 @@ State when this package was prepared:
 
 - System: Debian 13 trixie, aarch64, Raspberry Pi CM5/uConsole.
 - Hyprland is installed from `trixie-backports`.
-- Recommended graphical session: `Hyprland`, which runs `/usr/bin/start-hyprland`.
+- Recommended graphical session: `Hyprland`, with the local `~/.local/bin/start-hyprland` wrapper when launching manually or through user PATH.
 - Conserved fallback session: `rpd-labwc`.
 
 ## Relevant Packages
@@ -65,6 +65,8 @@ build-essential
 ~/.local/bin/uconsole-cpu-load
 ~/.local/bin/uconsole-gpu-load
 ~/.local/bin/uconsole-theme
+~/.local/bin/start-hyprland
+~/.local/bin/Hyprland
 ~/.local/bin/swww
 ~/.local/bin/swww-daemon
 /etc/keyd/default.conf
@@ -73,7 +75,9 @@ build-essential
 ## Technical Decisions
 
 - Active state observed on 2026-06-14: the live desktop may have a generated theme and selected wallpaper. Those values are user state created by `uconsole-theme` and `uconsole-wallpaper`; the repo keeps portable defaults.
-- Graphical login: systemd should use `graphical.target`, LightDM should be enabled, and `/etc/lightdm/lightdm.conf` can use `autologin-user=uconsole`, `user-session=hyprland`, and `autologin-session=hyprland` for direct boot into the session that calls `/usr/bin/start-hyprland`.
+- Graphical login: systemd should use `graphical.target`, LightDM should be enabled, and `/etc/lightdm/lightdm.conf` can use `autologin-user=uconsole`, `user-session=hyprland`, and `autologin-session=hyprland` for direct boot.
+- Launch wrappers: `~/.local/bin/start-hyprland` must remain a thin wrapper around `/usr/bin/start-hyprland --path "$HOME/.local/bin/Hyprland"`, and `~/.local/bin/Hyprland` must remain a thin wrapper around `/usr/bin/Hyprland`.
+- Avoid HDMI/DRM auto-probing wrappers. Testing showed launchers that export `AQ_DRM_DEVICES`, `DRI_PRIME`, `WLR_RENDER_DRM_DEVICE`, or poll HDMI hotplug can push Hyprland above 200% CPU on this device. The stable profile disables HDMI in `hyprland.conf` and leaves DRM selection to Hyprland.
 - Wallpapers: static images use `swaybg`; GIF uses `swww`. Video wallpapers are intentionally unsupported on this device profile.
 - `swww` was built locally from `~/src/swww` with stable Rust and installed as `~/.local/bin/swww` plus `~/.local/bin/swww-daemon`. The repo also includes those ARM64 binaries under `bin/`.
 - GIF optimization: `scripts/optimize-wallpaper-gifs.sh` creates persistent `*.swww.png` posters and `*.swww.gif` optimized copies when they are smaller than the original. `uconsole-wallpaper` keeps state pointing at the original GIF, loads the poster first to avoid a black boot screen, and then loads the optimized GIF in the background. The picker hides generated sidecars.
@@ -112,7 +116,7 @@ cd ~/uconsole-hyprland-dotfiles
 ./install.sh
 ```
 
-Copy only dotfiles and bundled local binaries:
+Copy only dotfiles, launch wrappers, and bundled local binaries:
 
 ```sh
 ./scripts/install.sh

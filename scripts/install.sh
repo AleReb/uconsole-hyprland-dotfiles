@@ -32,6 +32,11 @@ done
 if [ -e "$HOME/.local/bin" ]; then
     mkdir -p "$BACKUP/local-bin"
     find "$HOME/.local/bin" -maxdepth 1 -type f -name 'uconsole-*' -exec cp -a {} "$BACKUP/local-bin/" \;
+    for file in Hyprland start-hyprland startx-hyprland Hyprland.drm-wrapper.bak; do
+        if [ -e "$HOME/.local/bin/$file" ]; then
+            cp -a "$HOME/.local/bin/$file" "$BACKUP/local-bin/"
+        fi
+    done
 fi
 
 if [ -e /etc/keyd/default.conf ]; then
@@ -53,12 +58,21 @@ cp -a "$ROOT/config/volume_osd.sh" "$HOME/.config/"
 chmod +x "$HOME/.config/brightness_osd.sh" "$HOME/.config/volume_osd.sh"
 cp -a "$ROOT/bin"/uconsole-* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin"/uconsole-*
+for file in Hyprland start-hyprland; do
+    if [ -f "$ROOT/bin/$file" ]; then
+        cp -a "$ROOT/bin/$file" "$HOME/.local/bin/"
+        chmod +x "$HOME/.local/bin/$file"
+    fi
+done
 for file in swww swww-daemon; do
     if [ -f "$ROOT/bin/$file" ]; then
         cp -a "$ROOT/bin/$file" "$HOME/.local/bin/"
         chmod +x "$HOME/.local/bin/$file"
     fi
 done
+rm -f "$HOME/.local/bin/uconsole-hypr-hotplug" \
+    "$HOME/.local/bin/Hyprland.drm-wrapper.bak" \
+    "$HOME/.local/bin/startx-hyprland"
 
 if [ -f "$ROOT/keyd/default.conf" ]; then
     sudo install -m 0644 "$ROOT/keyd/default.conf" /etc/keyd/default.conf
