@@ -1,0 +1,53 @@
+#!/bin/sh
+set -eu
+
+runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+log_file="$runtime_dir/uconsole-display-autoswitch.log"
+lock_dir="$runtime_dir/uconsole-display-autoswitch.lock"
+cooldown_file="$runtime_dir/uconsole-display-autoswitch.last"
+
+if ! mkdir "$lock_dir" 2>/dev/null; then
+    exit 0
+fi
+trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT INT TERM
+
+log() {
+    printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$log_file"
+}
+
+cooldown_active() {
+    now=$(date +%s)
+    last=$(cat "$cooldown_file" 2>/dev/null || printf '0')
+    [ "$((now - last))" -lt 10 ]
+}
+
+mark_switch() {
+    date +%s >"$cooldown_file"
+}
+
+maybe_switch() {
+    status=$(/home/uconsole/.local/bin/uconsole-display-switch status 2>/dev/null || true)
+    current=$(printf '%s\n' "$status" | sed -n 's/^CURRENT_MODE=//p' | tail -n 1)
+    target=$(printf '%s\n' "$status" | sed -n 's/^TARGET_MODE=//p' | tail -n 1)
+
+    [ -n "$current" ] || current=unknown
+    [ -n "$target" ] || target=unknown
+
+    if [ "$current" != "$target" ] && [ "$target" != unknown ]; then
+        if cooldown_active; then
+            log "cooldown current=$current target=$target"
+            return 0
+        fi
+        mark_switch
+        log "switch current=$current target=$target"
+        /home/uconsole/.local/bin/uconsole-display-switch switch
+        exit 0
+    fi
+}
+
+log "started mode=poll"
+
+while :; do
+    maybe_switch
+    sleep 2
+done

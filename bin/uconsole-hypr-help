@@ -12,7 +12,8 @@ Applications
   Super + C            Editor
   Super + B            Browser
   Super + H            This help screen
-  HDMI                 Connect cable, then log out and log back in
+  HDMI                 Auto-switches on connect/disconnect
+  Super + Shift + H    Switch HDMI/DSI by restarting Hyprland
   Super + Shift + B    Restart top bar
   Super + Shift + C    CAVA audio bars
   Super + Shift + T    Theme picker

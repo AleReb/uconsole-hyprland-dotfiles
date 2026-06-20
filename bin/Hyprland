@@ -37,8 +37,8 @@ if [ -n "$hdmi_connector" ] && [ -n "$hdmi_card" ]; then
     export AQ_DRM_DEVICES="$hdmi_card"
     monitor_mode=hdmi
     cat >"$monitor_conf" <<'EOF'
-monitor = HDMI-A-1,preferred,0x0,1
-monitor = HDMI-A-2,preferred,0x0,1
+monitor = HDMI-A-1,preferred,0x0,1.12
+monitor = HDMI-A-2,preferred,0x0,1.12
 monitor = DSI-2,disable
 monitor = DSI-1,disable
 monitor = ,preferred,auto,1
@@ -47,8 +47,8 @@ elif [ -n "$dsi_card" ]; then
     export AQ_DRM_DEVICES="$dsi_card"
     monitor_mode=dsi
     cat >"$monitor_conf" <<'EOF'
-monitor = DSI-2,preferred,0x0,1.07,transform,3
-monitor = DSI-1,preferred,0x0,1.07,transform,3
+monitor = DSI-2,preferred,0x0,1.066406,transform,3
+monitor = DSI-1,preferred,0x0,1.066406,transform,3
 monitor = HDMI-A-1,disable
 monitor = HDMI-A-2,disable
 monitor = ,preferred,auto,1

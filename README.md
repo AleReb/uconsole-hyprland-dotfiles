@@ -39,6 +39,8 @@ This profile installs two local launch wrappers:
 
 `~/.local/bin/start-hyprland` delegates to `/usr/bin/start-hyprland` with `--path ~/.local/bin/Hyprland`. `~/.local/bin/Hyprland` detects HDMI at startup, writes `~/.cache/hypr/uconsole-monitors.conf`, and sets `AQ_DRM_DEVICES` only for the selected output card. Keep this wrapper startup-only: do not add HDMI hotplug polling, restart loops, `DRI_PRIME`, or `WLR_RENDER_DRM_DEVICE`; those paths caused high CPU on this uConsole profile.
 
+HDMI connect/disconnect is watched by `uconsole-display-autoswitch` through DRM udev events. It does not poll. When HDMI state changes, it restarts only Hyprland so the startup wrapper can select the correct DRM card. `Super + Shift + H` runs the same switch manually as a fallback.
+
 If packages are already installed and you only want to copy dotfiles:
 
 ```sh
@@ -54,6 +56,7 @@ If packages are already installed and you only want to copy dotfiles:
 - `Super + E`: file manager.
 - `Super + B`: browser.
 - `Super + C`: editor.
+- `Super + Shift + H`: switch HDMI/DSI by restarting Hyprland intentionally.
 - `Super + Shift + W`: wallpaper picker.
 - `Super + Shift + .`: next wallpaper.
 - `Super + Shift + ,`: previous wallpaper.

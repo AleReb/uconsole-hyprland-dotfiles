@@ -1,0 +1,76 @@
+#!/bin/sh
+set -eu
+
+runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+state_file="$runtime_dir/uconsole-hyprland-wrapper.log"
+
+notify() {
+    notify-send "Pantalla" "$1" >/dev/null 2>&1 || true
+}
+
+current_mode() {
+    sed -n 's/^MONITOR_MODE=//p' "$state_file" 2>/dev/null | tail -n 1
+}
+
+hdmi_connected() {
+    for status in /sys/class/drm/card*-HDMI-A-*/status /sys/class/drm/card*-HDMI-*/status; do
+        [ -e "$status" ] || continue
+        [ "$(cat "$status" 2>/dev/null)" = connected ] && return 0
+    done
+    return 1
+}
+
+target_mode() {
+    if hdmi_connected; then
+        printf 'hdmi\n'
+    else
+        printf 'dsi\n'
+    fi
+}
+
+status() {
+    current=$(current_mode)
+    target=$(target_mode)
+    printf 'CURRENT_MODE=%s\n' "${current:-unknown}"
+    printf 'TARGET_MODE=%s\n' "$target"
+}
+
+switch_display() {
+    current=$(current_mode)
+    target=$(target_mode)
+
+    if [ "$current" = "$target" ]; then
+        case "$target" in
+            hdmi) notify "HDMI ya esta activo." ;;
+            dsi) notify "Pantalla interna ya esta activa." ;;
+            *) notify "Pantalla ya esta en el modo actual." ;;
+        esac
+        status
+        exit 0
+    fi
+
+    case "$target" in
+        hdmi)
+            notify "HDMI conectado. Reiniciando solo Hyprland."
+            ;;
+        dsi)
+            notify "HDMI desconectado. Volviendo a pantalla interna."
+            ;;
+    esac
+
+    sleep 1
+    hyprctl dispatch exit
+}
+
+case "${1:-switch}" in
+    switch|apply)
+        switch_display
+        ;;
+    status)
+        status
+        ;;
+    *)
+        printf 'Usage: %s [switch|status]\n' "$0" >&2
+        exit 2
+        ;;
+esac
