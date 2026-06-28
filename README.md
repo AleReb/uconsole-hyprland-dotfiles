@@ -5,8 +5,8 @@ Portable Debian 13 / Raspberry Pi CM5 Hyprland setup for the ClockworkPi uConsol
 ## Included
 
 - Hyprland configuration tuned for the rotated uConsole display.
-- Compact Waybar with workspaces, date/time, styled calendar tooltip, temperature, CPU, GPU, volume, network, battery, and tray.
-- NetworkManager tray icon for WiFi changes.
+- Compact Waybar with workspaces, date/time, styled calendar tooltip, temperature, CPU, GPU, volume, battery, and tray.
+- NetworkManager and Blueman tray icons for WiFi and Bluetooth status/changes.
 - Wofi launcher, Foot terminal, Dunst notifications, CAVA audio visualizer, and local theme selector.
 - `keyd` remaps:
   - `open = leftmeta`, used as `Super`.
@@ -181,6 +181,10 @@ wpctl set-volume -l 2.0 @DEFAULT_AUDIO_SINK@ 5%+
 ```
 
 Audio above 100% can distort, especially on the built-in uConsole speakers. The extra range is mainly useful for quiet sources.
+
+## Bluetooth
+
+Bluetooth is handled by Blueman. Hyprland starts `blueman-applet`, and Waybar only shows the tray icon next to the WiFi tray icon. Use the Blueman icon to pair, trust, connect, disconnect, or remove devices.
 
 ## Notes
 

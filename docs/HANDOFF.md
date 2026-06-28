@@ -28,6 +28,7 @@ playerctl
 pavucontrol
 network-manager-gnome
 yad
+bluez
 wev
 ffmpeg
 liblz4-1
@@ -86,7 +87,8 @@ build-essential
 - uConsole display scale: DSI output uses scale `1.07`, cursor size 28, and slightly larger Waybar/Foot/Wofi sizing.
 - Theme management: `uconsole-theme` updates Hyprland, Waybar, GTK tooltip/calendar styling, Wofi, Foot, Dunst, and OSD colors.
 - Audio: volume keys use PipeWire through `wpctl`; volume-up allows software boost to 200% with `wpctl set-volume -l 2.0`. Audio above 100% can distort.
-- Network: `nm-applet --indicator` is kept for a clickable WiFi tray icon. The Waybar network module remains a compact status display.
+- Network: `nm-applet --indicator` is kept for clickable WiFi status and changes. Waybar does not show a separate network module.
+- Bluetooth: `blueman-applet` is started by Hyprland and exposed through the Waybar tray next to `nm-applet`. Waybar does not show a separate Bluetooth text module.
 - Waybar clock: center module shows date/time, hover shows the built-in calendar tooltip, and click opens a larger `yad` calendar. Tooltip rounding and `GtkCalendar` font size are controlled by `config/waybar/style.css` and `config/gtk-3.0/gtk.css`.
 - CPU/GPU in Waybar:
   - `T` uses thermal zone 0.

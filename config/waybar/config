@@ -8,7 +8,7 @@
   "margin-right": 6,
   "modules-left": ["hyprland/workspaces"],
   "modules-center": ["clock"],
-  "modules-right": ["temperature", "custom/cpu", "custom/gpu", "pulseaudio", "network", "battery", "tray"],
+  "modules-right": ["temperature", "custom/cpu", "custom/gpu", "pulseaudio", "battery", "tray"],
   "hyprland/workspaces": {
     "disable-scroll": true,
     "all-outputs": true,
@@ -69,12 +69,6 @@
   },
   "backlight": {
     "format": "BRT {percent}"
-  },
-  "network": {
-    "format-wifi": "WIFI {signalStrength}",
-    "format-ethernet": "ETH",
-    "format-disconnected": "OFF",
-    "on-click": "nm-connection-editor"
   },
   "battery": {
     "format": "BAT {capacity}",
