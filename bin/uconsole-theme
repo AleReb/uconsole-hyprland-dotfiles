@@ -92,7 +92,7 @@ tooltip label {
 #custom-gpu,
 #temperature,
 #pulseaudio,
-#network,
+#bluetooth,
 #battery,
 #tray {
   background: rgba(${panel}, 0.92);
@@ -117,7 +117,7 @@ tooltip label {
 #custom-gpu,
 #temperature,
 #pulseaudio,
-#network,
+#bluetooth,
 #battery,
 #tray {
   padding: 0 10px;
