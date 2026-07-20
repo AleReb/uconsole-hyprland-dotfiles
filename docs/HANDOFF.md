@@ -84,7 +84,7 @@ build-essential
 - `swww` was built locally from `~/src/swww` with stable Rust and installed as `~/.local/bin/swww` plus `~/.local/bin/swww-daemon`. The repo also includes those ARM64 binaries under `bin/`.
 - GIF optimization: `scripts/optimize-wallpaper-gifs.sh` creates persistent `*.swww.png` posters and `*.swww.gif` optimized copies when they are smaller than the original. `uconsole-wallpaper` keeps state pointing at the original GIF, loads the poster first to avoid a black boot screen, and then loads the optimized GIF in the background. The picker hides generated sidecars.
 - Avoid `hyprpaper` for this device state. Testing showed `hyprctl hyprpaper wallpaper` could hang and create high CPU load.
-- uConsole display scale: DSI output uses scale `1.07`, cursor size 28, and slightly larger Waybar/Foot/Wofi sizing.
+- uConsole display scale: DSI output uses native scale `1.0`; rotation remains at 270 degrees (`transform,3`). Cursor size 28 and the slightly larger Waybar/Foot/Wofi sizing remain independent of monitor scaling.
 - Theme management: `uconsole-theme` updates Hyprland, Waybar, GTK tooltip/calendar styling, Wofi, Foot, Dunst, and OSD colors.
 - Audio: volume keys use PipeWire through `wpctl`; volume-up allows software boost to 200% with `wpctl set-volume -l 2.0`. Audio above 100% can distort.
 - Network: `nm-applet --indicator` is kept for clickable WiFi status and changes. Waybar does not show a separate network module.
