@@ -58,7 +58,7 @@ cp -a "$ROOT/config/volume_osd.sh" "$HOME/.config/"
 chmod +x "$HOME/.config/brightness_osd.sh" "$HOME/.config/volume_osd.sh"
 cp -a "$ROOT/bin"/uconsole-* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin"/uconsole-*
-for file in Hyprland start-hyprland; do
+for file in Hyprland Hyprland-mgpu start-hyprland; do
     if [ -f "$ROOT/bin/$file" ]; then
         cp -a "$ROOT/bin/$file" "$HOME/.local/bin/"
         chmod +x "$HOME/.local/bin/$file"

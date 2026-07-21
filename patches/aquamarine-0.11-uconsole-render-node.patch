@@ -1,0 +1,233 @@
+diff --git a/src/backend/Session.cpp b/src/backend/Session.cpp
+index 87b51a1..cada1a4 100644
+--- a/src/backend/Session.cpp
++++ b/src/backend/Session.cpp
+@@ -1,4 +1,5 @@
+ #include <aquamarine/backend/Backend.hpp>
++#include <cstdlib>
+ #include <fcntl.h>
+
+ extern "C" {
+@@ -165,6 +166,20 @@ void Aquamarine::CSessionDevice::resolveMatchingRenderNode(udev_device* cardDevi
+     if (!cardDevice)
+         return;
+
++    // uConsole CM5 exposes DSI and HDMI as independent KMS devices while V3D
++    // is a third DRM device with the only render node. Allow the isolated test
++    // launcher to make that relationship explicit instead of guessing from
++    // unrelated platform parents.
++    if (const char* forcedRenderNode = std::getenv("AQ_RENDER_NODE"); forcedRenderNode && *forcedRenderNode) {
++        renderNodeFd = open(forcedRenderNode, O_RDWR | O_CLOEXEC);
++        if (renderNodeFd >= 0) {
++            session->backend->log(AQ_LOG_WARNING, std::format("drm: AQ_RENDER_NODE forced {} for KMS device {}", forcedRenderNode, path));
++            return;
++        }
++
++        session->backend->log(AQ_LOG_ERROR, std::format("drm: Failed to open forced AQ_RENDER_NODE {} for KMS device {}", forcedRenderNode, path));
++    }
++
+     auto*       parentDevice  = udev_device_get_parent(cardDevice);
+     const char* parentSyspath = parentDevice ? udev_device_get_syspath(parentDevice) : nullptr;
+
+@@ -205,6 +220,69 @@ void Aquamarine::CSessionDevice::resolveMatchingRenderNode(udev_device* cardDevi
+         udev_device_unref(dev);
+     }
+
++    // Re-add the pre-35fa4a9 first-renderD fallback for the case where
++    // parent-syspath matching fails. Required on split-node platforms
++    // like Apple Silicon, where the GPU and KMS device sit under
++    // different parent platform devices and the match never succeeds.
++    // Without this, DRM.cpp's renderer attach falls back to gpu->fd
++    // (the KMS device fd); on apple-drm that fd has no GL/EGL driver,
++    // so Mesa is forced to llvmpipe and the desktop runs in software.
++    //
++    // We only fall back when there is exactly one renderD on the
++    // system. Multi-renderD configs (eGPU + iGPU, evdi, capture
++    // devices) can't be disambiguated from this layer; picking the
++    // wrong one is what regressed PR #237 per #260 (hyprpaper SIGABRT
++    // on eglQueryDeviceStringEXT). Counting first lets Asahi succeed
++    // while leaving multi-renderD systems unchanged from upstream.
++    //
++    // Refs hyprwm/aquamarine#260 (M1/M2 reports), PR #237 (unconditional
++    // for non-standard buses, reverted by 8ed71bb), commit 2455556b
++    // (last known-good on M-series Asahi per the #260 thread).
++    if (renderNodeFd < 0) {
++        int renderDCount = 0;
++        udev_list_entry* countEntry = nullptr;
++        udev_list_entry_foreach(countEntry, devices) {
++            const auto* path = udev_list_entry_get_name(countEntry);
++            auto        dev  = udev_device_new_from_syspath(session->udevHandle, path);
++            if (!dev)
++                continue;
++            const auto* devnode = udev_device_get_devnode(dev);
++            const auto* devtype = udev_device_get_devtype(dev);
++            if (devnode && devtype && strcmp(devtype, "drm_minor") == 0 && strstr(devnode, "renderD"))
++                ++renderDCount;
++            udev_device_unref(dev);
++        }
++
++        if (renderDCount == 1) {
++            udev_list_entry* fbEntry = nullptr;
++            udev_list_entry_foreach(fbEntry, devices) {
++                const auto* fbPath = udev_list_entry_get_name(fbEntry);
++                auto        fbDev  = udev_device_new_from_syspath(session->udevHandle, fbPath);
++                if (!fbDev)
++                    continue;
++                const auto* fbDevnode = udev_device_get_devnode(fbDev);
++                const auto* fbDevtype = udev_device_get_devtype(fbDev);
++                if (!fbDevnode || !fbDevtype || strcmp(fbDevtype, "drm_minor") != 0 || !strstr(fbDevnode, "renderD")) {
++                    udev_device_unref(fbDev);
++                    continue;
++                }
++                renderNodeFd = open(fbDevnode, O_RDWR | O_CLOEXEC);
++                if (renderNodeFd >= 0) {
++                    session->backend->log(AQ_LOG_WARNING,
++                        std::format("drm: No matching render node for {}, falling back to sole renderD on the system: {}",
++                            parentSyspath ? parentSyspath : "(unknown)", fbDevnode));
++                    udev_device_unref(fbDev);
++                    break;
++                }
++                udev_device_unref(fbDev);
++            }
++        } else if (renderDCount > 1) {
++            session->backend->log(AQ_LOG_WARNING,
++                std::format("drm: No matching render node for {}, refusing to guess among {} renderD candidates; leaving renderer to fall through to KMS fd (may force software rendering; set AQ_DRM_DEVICES to disambiguate)",
++                    parentSyspath ? parentSyspath : "(unknown)", renderDCount));
++        }
++    }
++
+     udev_enumerate_unref(enumerate);
+ }
+
+diff --git a/src/backend/drm/Renderer.cpp b/src/backend/drm/Renderer.cpp
+index 580dceb..db481ac 100644
+--- a/src/backend/drm/Renderer.cpp
++++ b/src/backend/drm/Renderer.cpp
+@@ -2,8 +2,11 @@
+ #include <xf86drm.h>
+ #include <xf86drmMode.h>
+ #include <algorithm>
++#include <cstdlib>
+ #include <cstring>
+ #include <fcntl.h>
++#include <mutex>
++#include <unordered_map>
+ #include <unistd.h>
+ #include "Math.hpp"
+ #include "Shared.hpp"
+@@ -36,6 +39,34 @@ using namespace Hyprutils::OS;
+ // static funcs
+ static WP<CBackend> gBackend;
+
++// EGL_KHR_display_reference asks EGL to track repeated EGLDisplay handles.
++// Mesa/V3D does not expose it here, while the uConsole split-KMS setup creates
++// multiple renderers against the same forced render node. Calling eglTerminate
++// for one renderer would otherwise invalidate every renderer using that
++// EGLDisplay.
++static std::mutex                             gManualEGLDisplayRefsMutex;
++static std::unordered_map<EGLDisplay, size_t> gManualEGLDisplayRefs;
++
++static size_t retainManualEGLDisplayReference(EGLDisplay display) {
++    std::lock_guard<std::mutex> lock(gManualEGLDisplayRefsMutex);
++    return ++gManualEGLDisplayRefs[display];
++}
++
++static bool releaseManualEGLDisplayReference(EGLDisplay display) {
++    std::lock_guard<std::mutex> lock(gManualEGLDisplayRefsMutex);
++    const auto                  it = gManualEGLDisplayRefs.find(display);
++
++    if (it == gManualEGLDisplayRefs.end())
++        return true;
++
++    if (--it->second == 0) {
++        gManualEGLDisplayRefs.erase(it);
++        return true;
++    }
++
++    return false;
++}
++
+ // ------------------- shader utils
+
+ static GLuint compileShader(const GLuint& type, std::string src) {
+@@ -253,10 +284,24 @@ EGLDeviceEXT CDRMRenderer::eglDeviceFromDRMFD(int drmFD) {
+         return EGL_NO_DEVICE_EXT;
+     }
+
++    int matchingFD = drmFD;
++    int forcedFD   = -1;
++    if (const char* forcedRenderNode = std::getenv("AQ_RENDER_NODE"); forcedRenderNode && *forcedRenderNode) {
++        forcedFD = open(forcedRenderNode, O_RDWR | O_CLOEXEC);
++        if (forcedFD >= 0) {
++            matchingFD = forcedFD;
++            backend->log(AQ_LOG_DEBUG, std::format("CDRMRenderer(drm): forcing EGL device match through {}", forcedRenderNode));
++        } else {
++            backend->log(AQ_LOG_ERROR, std::format("CDRMRenderer(drm): failed to open forced EGL render node {}", forcedRenderNode));
++        }
++    }
++
+     drmDevice* drmDev = nullptr;
+-    if (int ret = drmGetDevice(drmFD, &drmDev); ret < 0) {
++    if (int ret = drmGetDevice(matchingFD, &drmDev); ret < 0) {
+         backend->log(AQ_LOG_ERROR, "CDRMRenderer(drm): drmGetDevice failed");
+         drmFreeDevice(&drmDev);
++        if (forcedFD >= 0)
++            close(forcedFD);
+         return EGL_NO_DEVICE_EXT;
+     }
+
+@@ -268,11 +313,15 @@ EGLDeviceEXT CDRMRenderer::eglDeviceFromDRMFD(int drmFD) {
+         if (drmDeviceHasName(drmDev, devName)) {
+             backend->log(AQ_LOG_DEBUG, std::format("CDRMRenderer(drm): Using device {}", devName));
+             drmFreeDevice(&drmDev);
++            if (forcedFD >= 0)
++                close(forcedFD);
+             return d;
+         }
+     }
+
+     drmFreeDevice(&drmDev);
++    if (forcedFD >= 0)
++        close(forcedFD);
+     return EGL_NO_DEVICE_EXT;
+ }
+
+@@ -388,7 +437,8 @@ Aquamarine::CDRMRenderer::~CDRMRenderer() {
+     if (egl.display && egl.context != EGL_NO_CONTEXT && egl.context != nullptr)
+         eglDestroyContext(egl.display, egl.context);
+
+-    if (egl.display)
++    const bool terminateDisplay = egl.display && (!manualDisplayReference || releaseManualEGLDisplayReference(egl.display));
++    if (terminateDisplay)
+         eglTerminate(egl.display);
+
+     eglReleaseThread();
+@@ -447,6 +497,12 @@ void CDRMRenderer::initContext() {
+         return;
+     }
+
++    if (!exts.KHR_display_reference) {
++        manualDisplayReference = true;
++        const auto refs         = retainManualEGLDisplayReference(egl.display);
++        backend->log(AQ_LOG_DEBUG, std::format("CDRMRenderer: manually tracking shared EGLDisplay ({} users)", refs));
++    }
++
+     std::string EGLEXTENSIONS = eglQueryString(egl.display, EGL_EXTENSIONS);
+
+     exts.IMG_context_priority               = EGLEXTENSIONS.contains("IMG_context_priority");
+diff --git a/src/backend/drm/Renderer.hpp b/src/backend/drm/Renderer.hpp
+index ca59dfa..702fd3b 100644
+--- a/src/backend/drm/Renderer.hpp
++++ b/src/backend/drm/Renderer.hpp
+@@ -153,5 +153,11 @@ namespace Aquamarine {
+             int        lastBlitSyncFD = -1;
+         } egl;
+
++        // EGL_KHR_display_reference is not exposed by Mesa/V3D on the
++        // uConsole. Multiple KMS backends can therefore receive the same
++        // EGLDisplay for the forced render node without driver-side lifetime
++        // tracking. Keep a userspace reference while that display is shared.
++        bool manualDisplayReference = false;
++
+         CGLTex                                        glTex(Hyprutils::Memory::CSharedPointer<IBuffer> buf);
+         void                                          readBuffer(Hyprutils::Memory::CSharedPointer<IBuffer> buf, std::span<uint8_t> out);

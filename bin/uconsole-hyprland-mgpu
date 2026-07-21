@@ -1,0 +1,298 @@
+#!/bin/sh
+# Launch the packaged Hyprland with the isolated Aquamarine single-renderD fix.
+# The normal ~/.local/bin/Hyprland launcher is intentionally left untouched.
+
+set -eu
+
+PATCH_PREFIX=${UCONSOLE_AQUAMARINE_PREFIX:-"$HOME/.local/opt/aquamarine-0.11-uconsole"}
+PATCH_LIB="$PATCH_PREFIX/lib/libaquamarine.so.10"
+INNER_LAUNCHER="$HOME/.local/bin/Hyprland-mgpu"
+RUNTIME_DIR=${XDG_RUNTIME_DIR:-"/tmp/uconsole-$(id -u)"}
+MONITOR_CONF="$RUNTIME_DIR/uconsole-monitors-mgpu.conf"
+TEST_CONFIG="$RUNTIME_DIR/uconsole-hyprland-mgpu.conf"
+LOG_FILE="$RUNTIME_DIR/uconsole-hyprland-mgpu.log"
+TEST_SECONDS=${UCONSOLE_MGPU_TEST_SECONDS:-90}
+CAPTURE_DIR=${UCONSOLE_MGPU_CAPTURE_DIR:-"$HOME/display-debug"}
+
+usage() {
+    cat <<'EOF'
+Uso: uconsole-hyprland-mgpu COMANDO
+
+Comandos:
+  check   Comprueba biblioteca, tarjetas DRM, renderD y estado HDMI.
+  test    Inicia la prueba de dos pantallas y sale automáticamente en 90 s.
+  start   Inicia Hyprland de dos pantallas sin temporizador.
+
+Ejecuta test o start desde una TTY, después de cerrar la sesión gráfica.
+El DSI se configura siempre con escala 1.0 y transform 3.
+EOF
+}
+
+card_from_connectors() {
+    for connector in "$@"; do
+        [ -e "$connector" ] || continue
+        card=${connector##*/}
+        card=${card%%-*}
+        if [ -c "/dev/dri/$card" ]; then
+            printf '%s\n' "/dev/dri/$card"
+            return 0
+        fi
+    done
+    return 1
+}
+
+first_connector() {
+    for connector in "$@"; do
+        [ -r "$connector/status" ] || continue
+        printf '%s\n' "$connector"
+        return 0
+    done
+    return 1
+}
+
+connected_connector() {
+    for connector in "$@"; do
+        [ -r "$connector/status" ] || continue
+        if [ "$(cat "$connector/status" 2>/dev/null)" = connected ]; then
+            printf '%s\n' "$connector"
+            return 0
+        fi
+    done
+    return 1
+}
+
+output_name() {
+    name=${1##*/}
+    name=${name#card*-}
+    printf '%s\n' "$name"
+}
+
+render_count=0
+render_node=
+for node in /dev/dri/renderD*; do
+    [ -c "$node" ] || continue
+    render_count=$((render_count + 1))
+    render_node=$node
+done
+
+dsi_connector=$(connected_connector /sys/class/drm/card*-DSI-* 2>/dev/null \
+    || first_connector /sys/class/drm/card*-DSI-* 2>/dev/null \
+    || true)
+hdmi_connector=$(connected_connector /sys/class/drm/card*-HDMI-A-* 2>/dev/null || true)
+dsi_card=$(card_from_connectors /sys/class/drm/card*-DSI-* 2>/dev/null || true)
+hdmi_card=$(card_from_connectors /sys/class/drm/card*-HDMI-A-* 2>/dev/null || true)
+
+show_check() {
+    printf 'Aquamarine corregida: %s\n' "$PATCH_LIB"
+    if [ -r "$PATCH_LIB" ]; then
+        printf '  estado: disponible\n'
+    else
+        printf '  estado: NO ENCONTRADA\n'
+    fi
+    printf 'DSI:  conector=%s tarjeta=%s\n' "${dsi_connector:-no encontrado}" "${dsi_card:-no encontrada}"
+    printf 'HDMI: conector=%s tarjeta=%s\n' "${hdmi_connector:-desconectado}" "${hdmi_card:-no encontrada}"
+    printf 'renderD: cantidad=%s nodo=%s\n' "$render_count" "${render_node:-ninguno}"
+    printf 'Rotacion DSI de la prueba: transform 3\n'
+}
+
+preflight() {
+    case "$TEST_SECONDS" in
+        ''|*[!0-9]*)
+            printf 'UCONSOLE_MGPU_TEST_SECONDS debe ser un numero entero.\n' >&2
+            return 1
+            ;;
+    esac
+    [ -x /usr/bin/Hyprland ] || {
+        printf 'No existe /usr/bin/Hyprland.\n' >&2
+        return 1
+    }
+    [ -x /usr/bin/start-hyprland ] || {
+        printf 'No existe /usr/bin/start-hyprland.\n' >&2
+        return 1
+    }
+    [ -x "$INNER_LAUNCHER" ] || {
+        printf 'Falta el lanzador interno: %s\n' "$INNER_LAUNCHER" >&2
+        return 1
+    }
+    [ -r "$PATCH_LIB" ] || {
+        printf 'Falta la biblioteca corregida: %s\n' "$PATCH_LIB" >&2
+        return 1
+    }
+    [ -n "$dsi_connector" ] && [ -n "$dsi_card" ] || {
+        printf 'No se pudo resolver la tarjeta DSI.\n' >&2
+        return 1
+    }
+    [ -n "$hdmi_card" ] || {
+        printf 'No se pudo resolver la tarjeta HDMI.\n' >&2
+        return 1
+    }
+    [ "$render_count" -eq 1 ] || {
+        printf 'La correccion exige exactamente un renderD; se encontraron %s.\n' "$render_count" >&2
+        return 1
+    }
+}
+
+start_runtime_log_capture() {
+    capture_stamp=$(date '+%Y%m%d-%H%M%S')
+    capture_file="$CAPTURE_DIR/$capture_stamp-$$-hypr-mgpu-runtime.log"
+    capture_marker="$RUNTIME_DIR/uconsole-mgpu-capture-marker-$$"
+    mkdir -p "$CAPTURE_DIR" "$RUNTIME_DIR"
+    : >"$capture_marker"
+
+    # start-hyprland puede borrar la instancia de /run al terminar. Esta copia
+    # se actualiza mientras la prueba vive para conservar incluso un fallo duro.
+    (
+        capture_until=$(( $(date +%s) + TEST_SECONDS + 20 ))
+        selected_log=
+        selected_instance=
+        wayland_display=
+        capture_cycles=0
+        while [ "$(date +%s)" -le "$capture_until" ]; do
+            if [ -z "$selected_log" ]; then
+                for candidate in "$RUNTIME_DIR"/hypr/*/hyprland.log; do
+                    [ -f "$candidate" ] || continue
+                    [ "$candidate" -nt "$capture_marker" ] || continue
+                    selected_log=$candidate
+                    instance_dir=${candidate%/*}
+                    selected_instance=${instance_dir##*/}
+                    break
+                done
+            fi
+            if [ -n "$selected_log" ] && [ -f "$selected_log" ]; then
+                if cp "$selected_log" "$capture_file.tmp" 2>/dev/null; then
+                    mv "$capture_file.tmp" "$capture_file"
+                fi
+
+                if command -v hyprctl >/dev/null 2>&1; then
+                    if HYPRLAND_INSTANCE_SIGNATURE="$selected_instance" \
+                        hyprctl monitors all >"$capture_file.monitors.tmp" 2>&1; then
+                        mv "$capture_file.monitors.tmp" "$capture_file.monitors"
+                    else
+                        rm -f "$capture_file.monitors.tmp"
+                    fi
+                fi
+
+                {
+                    for connector in "$dsi_connector" "$hdmi_connector"; do
+                        [ -n "$connector" ] || continue
+                        printf '%s: ' "${connector##*/}"
+                        printf 'status=%s ' "$(cat "$connector/status" 2>/dev/null || printf '?')"
+                        printf 'enabled=%s ' "$(cat "$connector/enabled" 2>/dev/null || printf '?')"
+                        printf 'dpms=%s\n' "$(cat "$connector/dpms" 2>/dev/null || printf '?')"
+                    done
+                } >"$capture_file.drm.tmp"
+                mv "$capture_file.drm.tmp" "$capture_file.drm"
+
+                capture_cycles=$((capture_cycles + 1))
+                if [ "$capture_cycles" -ge 5 ] && [ -z "$wayland_display" ]; then
+                    for candidate in "$RUNTIME_DIR"/wayland-*; do
+                        [ -S "$candidate" ] || continue
+                        [ "$candidate" -nt "$capture_marker" ] || continue
+                        wayland_display=${candidate##*/}
+                        break
+                    done
+                fi
+                if [ -n "$wayland_display" ] && command -v grim >/dev/null 2>&1; then
+                    if [ ! -s "$capture_file.dsi.png" ]; then
+                        WAYLAND_DISPLAY="$wayland_display" grim -o "$dsi_name" \
+                            "$capture_file.dsi.png" 2>/dev/null || rm -f "$capture_file.dsi.png"
+                    fi
+                    if [ ! -s "$capture_file.hdmi.png" ]; then
+                        WAYLAND_DISPLAY="$wayland_display" grim -o "$hdmi_name" \
+                            "$capture_file.hdmi.png" 2>/dev/null || rm -f "$capture_file.hdmi.png"
+                    fi
+                fi
+            fi
+            sleep 1
+        done
+    ) &
+
+    printf 'Log persistente de esta prueba: %s\n' "$capture_file"
+}
+
+write_dual_monitor_config() {
+    dsi_name=$(output_name "$dsi_connector")
+    hdmi_name=$(output_name "$hdmi_connector")
+    mkdir -p "${MONITOR_CONF%/*}" "$RUNTIME_DIR"
+    umask 077
+    {
+        printf 'monitor = %s,preferred,0x0,1.0,transform,3\n' "$dsi_name"
+        printf 'monitor = %s,preferred,1280x0,1.0\n' "$hdmi_name"
+        printf 'monitor = ,preferred,auto,1\n'
+        printf 'cursor:no_hardware_cursors = true\n'
+        printf 'debug:disable_logs = false\n'
+    } >"$MONITOR_CONF"
+
+    # La configuracion normal puede reescribir ~/.cache/hypr/uconsole-monitors.conf
+    # con un perfil de una sola pantalla. La prueba usa una copia aislada y no
+    # inicia el conmutador tradicional, para que esas reglas no la desactiven.
+    sed \
+        -e "s|^source = ~/.cache/hypr/uconsole-monitors.conf\$|source = $MONITOR_CONF|" \
+        -e '/^exec-once = setsid -f ~\/.local\/bin\/uconsole-display-autoswitch$/d' \
+        "$HOME/.config/hypr/hyprland.conf" >"$TEST_CONFIG"
+    grep -F "source = $MONITOR_CONF" "$TEST_CONFIG" >/dev/null || {
+        printf 'No se pudo aislar la configuracion de monitores.\n' >&2
+        return 1
+    }
+    {
+        printf 'AQUAMARINE=%s\n' "$PATCH_LIB"
+        printf 'AQ_DRM_DEVICES=%s:%s\n' "$dsi_card" "$hdmi_card"
+        printf 'RENDER_NODE=%s\n' "$render_node"
+        printf 'AQ_RENDER_NODE=%s\n' "$render_node"
+        printf 'DSI=%s transform=3 scale=1.0 position=0x0\n' "$dsi_name"
+        printf 'HDMI=%s scale=1.0 position=1280x0\n' "$hdmi_name"
+        printf 'MONITOR_CONF=%s\n' "$MONITOR_CONF"
+        printf 'TEST_CONFIG=%s\n' "$TEST_CONFIG"
+    } >"$LOG_FILE"
+}
+
+launch_dual() {
+    mode=$1
+    preflight
+    [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || {
+        printf 'Cierra primero la sesion Hyprland actual y ejecuta esto desde una TTY.\n' >&2
+        return 1
+    }
+    [ -n "$hdmi_connector" ] || {
+        printf 'Conecta HDMI antes de iniciar la prueba.\n' >&2
+        return 1
+    }
+
+    write_dual_monitor_config
+    export LD_LIBRARY_PATH="$PATCH_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export AQ_DRM_DEVICES="$dsi_card:$hdmi_card"
+    export AQ_RENDER_NODE="$render_node"
+    export UCONSOLE_HYPRLAND_MGPU=1
+
+    printf 'Iniciando DSI + HDMI con Aquamarine corregida.\n'
+    printf 'DSI conserva transform 3. Registro: %s\n' "$LOG_FILE"
+    start_runtime_log_capture
+
+    if [ "$mode" = test ]; then
+        printf 'La prueba terminara automaticamente despues de %s segundos.\n' "$TEST_SECONDS"
+        exec timeout --foreground --signal=TERM --kill-after=5s "${TEST_SECONDS}s" \
+            /usr/bin/start-hyprland --path "$INNER_LAUNCHER" -- --config "$TEST_CONFIG"
+    fi
+
+    exec /usr/bin/start-hyprland --path "$INNER_LAUNCHER" -- --config "$TEST_CONFIG"
+}
+
+case "${1:-}" in
+    check)
+        show_check
+        preflight
+        ;;
+    test)
+        launch_dual test
+        ;;
+    start)
+        launch_dual start
+        ;;
+    -h|--help|help|'')
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

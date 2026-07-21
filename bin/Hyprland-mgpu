@@ -1,0 +1,28 @@
+#!/bin/sh
+# Inner binary wrapper used by start-hyprland for the isolated multi-GPU test.
+
+set -eu
+
+patch_prefix=${UCONSOLE_AQUAMARINE_PREFIX:-"$HOME/.local/opt/aquamarine-0.11-uconsole"}
+patch_lib="$patch_prefix/lib/libaquamarine.so.10"
+dynamic_loader=/lib/ld-linux-aarch64.so.1
+
+[ -r "$patch_lib" ] || {
+    printf 'Falta la biblioteca Aquamarine corregida: %s\n' "$patch_lib" >&2
+    exit 1
+}
+[ -x "$dynamic_loader" ] || {
+    printf 'Falta el cargador dinamico ARM64: %s\n' "$dynamic_loader" >&2
+    exit 1
+}
+[ -n "${AQ_DRM_DEVICES:-}" ] || {
+    printf 'Falta AQ_DRM_DEVICES para la prueba multitarjeta.\n' >&2
+    exit 1
+}
+[ -n "${AQ_RENDER_NODE:-}" ] || {
+    printf 'Falta AQ_RENDER_NODE para la prueba multitarjeta.\n' >&2
+    exit 1
+}
+
+export LD_LIBRARY_PATH="$patch_prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$dynamic_loader" --library-path "$LD_LIBRARY_PATH" /usr/bin/Hyprland "$@"

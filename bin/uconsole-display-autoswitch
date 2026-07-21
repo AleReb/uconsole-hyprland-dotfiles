@@ -4,28 +4,21 @@ set -eu
 runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 log_file="$runtime_dir/uconsole-display-autoswitch.log"
 lock_dir="$runtime_dir/uconsole-display-autoswitch.lock"
-cooldown_file="$runtime_dir/uconsole-display-autoswitch.last"
 
 if ! mkdir "$lock_dir" 2>/dev/null; then
     exit 0
 fi
-trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT INT TERM
+cleanup() {
+    rmdir "$lock_dir" 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 0' INT TERM
 
 log() {
     printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$log_file"
 }
 
-cooldown_active() {
-    now=$(date +%s)
-    last=$(cat "$cooldown_file" 2>/dev/null || printf '0')
-    [ "$((now - last))" -lt 10 ]
-}
-
-mark_switch() {
-    date +%s >"$cooldown_file"
-}
-
-maybe_switch() {
+maybe_legacy_switch() {
     status=$(/home/uconsole/.local/bin/uconsole-display-switch status 2>/dev/null || true)
     current=$(printf '%s\n' "$status" | sed -n 's/^CURRENT_MODE=//p' | tail -n 1)
     target=$(printf '%s\n' "$status" | sed -n 's/^TARGET_MODE=//p' | tail -n 1)
@@ -34,20 +27,44 @@ maybe_switch() {
     [ -n "$target" ] || target=unknown
 
     if [ "$current" != "$target" ] && [ "$target" != unknown ]; then
-        if cooldown_active; then
-            log "cooldown current=$current target=$target"
-            return 0
-        fi
-        mark_switch
-        log "switch current=$current target=$target"
+        log "legacy-switch current=$current target=$target"
         /home/uconsole/.local/bin/uconsole-display-switch switch
         exit 0
     fi
 }
 
-log "started mode=poll"
+hdmi_state() {
+    for status in /sys/class/drm/card*-HDMI-A-*/status; do
+        [ -r "$status" ] || continue
+        if [ "$(cat "$status" 2>/dev/null)" = connected ]; then
+            connector=${status%/status}
+            connector=${connector##*/}
+            printf 'connected:%s\n' "${connector#card*-}"
+            return 0
+        fi
+    done
+    printf 'disconnected\n'
+}
+
+last_state=$(hdmi_state)
+log "started mode=hotplug state=$last_state"
 
 while :; do
-    maybe_switch
+    maybe_legacy_switch
+    state=$(hdmi_state)
+    if [ "$state" != "$last_state" ]; then
+        log "hotplug old=$last_state new=$state"
+        case "$state" in
+            connected:*)
+                output=${state#connected:}
+                if /home/uconsole/.local/bin/uconsole-wallpaper output "$output"; then
+                    log "wallpaper-restored output=$output"
+                else
+                    log "wallpaper-restore-failed output=$output"
+                fi
+                ;;
+        esac
+        last_state=$state
+    fi
     sleep 2
 done

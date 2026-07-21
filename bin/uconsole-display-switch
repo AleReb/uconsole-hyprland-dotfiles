@@ -3,6 +3,8 @@ set -eu
 
 runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 state_file="$runtime_dir/uconsole-hyprland-wrapper.log"
+patch_lib="$HOME/.local/opt/aquamarine-0.11-uconsole/lib/libaquamarine.so.10"
+dynamic_loader=/lib/ld-linux-aarch64.so.1
 
 notify() {
     notify-send "Pantalla" "$1" >/dev/null 2>&1 || true
@@ -20,8 +22,33 @@ hdmi_connected() {
     return 1
 }
 
+dual_available() {
+    [ -r "$patch_lib" ] && [ -x "$dynamic_loader" ] || return 1
+
+    dsi_found=0
+    hdmi_found=0
+    for connector in /sys/class/drm/card*-DSI-*; do
+        [ -e "$connector" ] && dsi_found=1
+    done
+    for connector in /sys/class/drm/card*-HDMI-A-*; do
+        [ -e "$connector" ] && hdmi_found=1
+    done
+    [ "$dsi_found" -eq 1 ] && [ "$hdmi_found" -eq 1 ] || return 1
+
+    render_count=0
+    for node in /dev/dri/renderD*; do
+        [ -c "$node" ] || continue
+        render_count=$((render_count + 1))
+    done
+    [ "$render_count" -eq 1 ]
+}
+
 target_mode() {
-    if hdmi_connected; then
+    if dual_available; then
+        # The patched backend opens both KMS cards even when HDMI is absent,
+        # so connector hotplug no longer requires restarting Hyprland.
+        printf 'dual\n'
+    elif hdmi_connected; then
         printf 'hdmi\n'
     else
         printf 'dsi\n'
@@ -41,6 +68,13 @@ switch_display() {
 
     if [ "$current" = "$target" ]; then
         case "$target" in
+            dual)
+                if hdmi_connected; then
+                    notify "Pantalla interna y HDMI estan activos."
+                else
+                    notify "Pantalla interna activa; HDMI listo para conexion en caliente."
+                fi
+                ;;
             hdmi) notify "HDMI ya esta activo." ;;
             dsi) notify "Pantalla interna ya esta activa." ;;
             *) notify "Pantalla ya esta en el modo actual." ;;
@@ -50,6 +84,9 @@ switch_display() {
     fi
 
     case "$target" in
+        dual)
+            notify "HDMI conectado. Reiniciando Hyprland en modo dual."
+            ;;
         hdmi)
             notify "HDMI conectado. Reiniciando solo Hyprland."
             ;;

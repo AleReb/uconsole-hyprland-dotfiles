@@ -256,6 +256,51 @@ apply_wallpaper() {
     printf '%s\n' "$!" > "$swaybg_pid"
 }
 
+apply_wallpaper_output() {
+    output="$1"
+    case "$output" in
+        ''|*[!A-Za-z0-9_.-]*) exit 2 ;;
+    esac
+
+    img="$(cat "$state_file" 2>/dev/null || sed -n 's/^wallpaper = ,//p' "$config" | head -n 1)"
+    [ -f "$img" ] || img="$HOME/.local/share/wallpapers/wall1.png"
+    [ -f "$img" ] || exit 1
+
+    if ! use_swww_for "$img"; then
+        apply_wallpaper "$img"
+        return
+    fi
+
+    display_img="$(optimized_gif_file "$img")"
+    poster_img="$(optimized_gif_poster_file "$img" 2>/dev/null || true)"
+    ready=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if swww query 2>/dev/null | grep -F ": $output:" >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+        sleep 1
+    done
+    [ "$ready" -eq 1 ] || {
+        log_msg "swww output not ready output=$output"
+        return 1
+    }
+
+    if [ -n "$poster_img" ]; then
+        swww img "$poster_img" --outputs "$output" --resize crop --transition-type none >/dev/null 2>&1 || true
+    fi
+
+    for attempt in 1 2; do
+        if swww img "$display_img" --outputs "$output" --resize crop --transition-type none >/dev/null 2>&1; then
+            log_msg "swww output loaded output=$output file=$display_img"
+            return 0
+        fi
+        log_msg "swww output load failed attempt=$attempt output=$output file=$display_img"
+        sleep 1
+    done
+    return 1
+}
+
 pick_wallpaper() {
     list_wallpapers | wofi --show dmenu --prompt "Wallpaper"
 }
@@ -299,8 +344,11 @@ case "${1:-select}" in
     apply)
         apply_wallpaper "${2:-}"
         ;;
+    output)
+        apply_wallpaper_output "${2:?missing output name}"
+        ;;
     *)
-        printf 'usage: %s [select|next|prev|current|apply|set PATH]\n' "$0" >&2
+        printf 'usage: %s [select|next|prev|current|apply|output NAME|set PATH]\n' "$0" >&2
         exit 2
         ;;
 esac

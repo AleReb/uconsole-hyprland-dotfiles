@@ -14,7 +14,7 @@ Portable Debian 13 / Raspberry Pi CM5 Hyprland setup for the ClockworkPi uConsol
 - Static wallpapers through `swaybg`.
 - Animated GIF wallpapers through the bundled ARM64 `swww` binaries.
 - Persistent GIF optimization helpers for faster boot wallpaper loading.
-- Lightweight Hyprland launch wrappers that select HDMI or DSI once at startup.
+- Hyprland launch wrappers that keep DSI active and support HDMI hotplug without restarting the session.
 - PipeWire volume keys with optional software boost up to 200%.
 - Compact `fastfetch` once per graphical login session.
 
@@ -37,9 +37,61 @@ This profile installs two local launch wrappers:
 ~/.local/bin/Hyprland
 ```
 
-`~/.local/bin/start-hyprland` delegates to `/usr/bin/start-hyprland` with `--path ~/.local/bin/Hyprland`. `~/.local/bin/Hyprland` detects HDMI at startup, writes `~/.cache/hypr/uconsole-monitors.conf`, and sets `AQ_DRM_DEVICES` only for the selected output card. Keep this wrapper startup-only: do not add HDMI hotplug polling, restart loops, `DRI_PRIME`, or `WLR_RENDER_DRM_DEVICE`; those paths caused high CPU on this uConsole profile.
+`~/.local/bin/start-hyprland` delegates to `/usr/bin/start-hyprland` with `--path ~/.local/bin/Hyprland`. `~/.local/bin/Hyprland` resolves both KMS cards and writes `~/.cache/hypr/uconsole-monitors.conf`. When the isolated Aquamarine fix is available, it opens DSI and HDMI at startup even if the HDMI connector is currently unplugged. That makes later connect/disconnect events work without restarting Hyprland. Both cards share the single V3D render node. If the fix is unavailable, the wrapper keeps the previous single-output recovery paths instead of leaving both screens black. Keep this wrapper startup-only: do not add `DRI_PRIME` or `WLR_RENDER_DRM_DEVICE`; those paths caused high CPU on this uConsole profile.
 
-HDMI connect/disconnect is watched by `uconsole-display-autoswitch` through DRM udev events. It does not poll. When HDMI state changes, it restarts only Hyprland so the startup wrapper can select the correct DRM card. `Super + Shift + H` runs the same switch manually as a fallback.
+HDMI connect/disconnect is checked by `uconsole-display-autoswitch`. In the patched `dual` mode it never closes Hyprland; on reconnection it asks `uconsole-wallpaper` to restore only the new HDMI output. Session restart remains only as a recovery fallback when the patched multi-card backend is unavailable. `Super + Shift + H` reports or applies that fallback manually.
+
+For a read-only display report from either Hyprland or Xorg, run:
+
+```sh
+uconsole-display-debug LABEL
+```
+
+Reports are saved under `~/display-debug/`. The command records DRM/KMS,
+Hyprland or XRandR state, display-related kernel messages, and wallpaper load;
+it does not change outputs or configuration.
+
+## DSI + HDMI Fix
+
+La explicación completa, el diagnóstico, la reconstrucción y la recuperación
+están en [`docs/DSI_HDMI_DUAL.md`](docs/DSI_HDMI_DUAL.md). El parche exacto de
+Aquamarine y su script de compilación también forman parte de este repositorio.
+
+The packaged Hyprland 0.55.2 uses Aquamarine 0.11.0. On the CM5 uConsole,
+DSI and HDMI are separate KMS cards but there is only one V3D `renderD` node.
+The local experimental launcher loads an isolated Aquamarine 0.11.0 build with
+upstream commit `f44fecf` backported. The first physical CM5 test showed that
+the generic fallback still left both KMS devices without an attached renderer.
+The isolated build therefore also accepts `AQ_RENDER_NODE`, and the uConsole
+launcher explicitly assigns its sole `/dev/dri/renderD128` node to both KMS
+devices. It also keeps a userspace reference count for a shared `EGLDisplay`
+when Mesa/V3D lacks `EGL_KHR_display_reference`; otherwise unplugging HDMI
+terminates the display still used by DSI. These overrides exist only in the
+isolated library.
+
+The Debian library and `/usr/bin/Hyprland` are not replaced. The validated fix
+is integrated into the normal `~/.local/bin/Hyprland` launcher whenever the
+split-KMS topology is available. Check the isolated test path from any session
+with:
+
+```sh
+uconsole-hyprland-mgpu check
+```
+
+For a recoverable physical test, connect HDMI, leave Hyprland for a TTY, and
+run:
+
+```sh
+uconsole-hyprland-mgpu test
+```
+
+The test starts through the packaged `start-hyprland` watchdog, configures DSI
+at `transform 3`, scale `1.0`, and HDMI to its right. It closes itself after 90
+seconds, returning to the TTY even if both screens are black. The successful
+physical test on 2026-07-21 showed both displays simultaneously. A later
+connect/disconnect/connect cycle kept Hyprland and DSI alive, restored HDMI,
+and reapplied the animated `swww` wallpaper only to that output. The test
+command remains available as a recoverable diagnostic.
 
 If packages are already installed and you only want to copy dotfiles:
 
@@ -56,7 +108,7 @@ If packages are already installed and you only want to copy dotfiles:
 - `Super + E`: file manager.
 - `Super + B`: browser.
 - `Super + C`: editor.
-- `Super + Shift + H`: switch HDMI/DSI by restarting Hyprland intentionally.
+- `Super + Shift + H`: report/apply the display fallback; patched hotplug does not restart Hyprland.
 - `Super + Shift + W`: wallpaper picker.
 - `Super + Shift + .`: next wallpaper.
 - `Super + Shift + ,`: previous wallpaper.

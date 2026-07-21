@@ -1,13 +1,20 @@
 #!/bin/sh
-# uConsole CM5: DSI and HDMI are exposed as separate DRM cards. Hyprland's
-# live multi-GPU path can detect both but fail to render HDMI, so choose one
-# output path at startup.
+# uConsole CM5: DSI and HDMI are separate KMS cards sharing one V3D renderD.
+# Use the isolated Aquamarine fix for dual output, with the old single-output
+# startup paths kept as a recovery fallback.
+
+set -eu
+
+patch_prefix=${UCONSOLE_AQUAMARINE_PREFIX:-"$HOME/.local/opt/aquamarine-0.11-uconsole"}
+patch_lib="$patch_prefix/lib/libaquamarine.so.10"
+dynamic_loader=/lib/ld-linux-aarch64.so.1
+
 card_from_connector() {
     for connector in "$@"; do
         [ -e "$connector" ] || continue
         card=${connector##*/}
         card=${card%%-*}
-        [ -e "/dev/dri/$card" ] && {
+        [ -c "/dev/dri/$card" ] && {
             printf '%s\n' "/dev/dri/$card"
             return 0
         }
@@ -17,7 +24,7 @@ card_from_connector() {
 
 connected_connector() {
     for connector in "$@"; do
-        [ -e "$connector/status" ] || continue
+        [ -r "$connector/status" ] || continue
         [ "$(cat "$connector/status" 2>/dev/null)" = connected ] && {
             printf '%s\n' "$connector"
             return 0
@@ -26,19 +33,45 @@ connected_connector() {
     return 1
 }
 
-dsi_card=$(card_from_connector /sys/class/drm/card*-DSI-* || true)
-hdmi_card=$(card_from_connector /sys/class/drm/card*-HDMI-* /sys/class/drm/card*-HDMI-A-* || true)
-hdmi_connector=$(connected_connector /sys/class/drm/card*-HDMI-A-* /sys/class/drm/card*-HDMI-* || true)
+dsi_card=$(card_from_connector /sys/class/drm/card*-DSI-* 2>/dev/null || true)
+hdmi_card=$(card_from_connector /sys/class/drm/card*-HDMI-A-* 2>/dev/null || true)
+hdmi_connector=$(connected_connector /sys/class/drm/card*-HDMI-A-* 2>/dev/null || true)
+
+render_count=0
+render_node=
+for node in /dev/dri/renderD*; do
+    [ -c "$node" ] || continue
+    render_count=$((render_count + 1))
+    render_node=$node
+done
 
 monitor_conf="${XDG_CACHE_HOME:-$HOME/.cache}/hypr/uconsole-monitors.conf"
-mkdir -p "${monitor_conf%/*}"
+runtime_dir=${XDG_RUNTIME_DIR:-/tmp}
+mkdir -p "${monitor_conf%/*}" "$runtime_dir"
 
-if [ -n "$hdmi_connector" ] && [ -n "$hdmi_card" ]; then
+use_patched_aquamarine=0
+if [ -n "$dsi_card" ] && [ -n "$hdmi_card" ] \
+    && [ "$dsi_card" != "$hdmi_card" ] && [ "$render_count" -eq 1 ] \
+    && [ -r "$patch_lib" ] && [ -x "$dynamic_loader" ]; then
+    export AQ_DRM_DEVICES="$dsi_card:$hdmi_card"
+    export AQ_RENDER_NODE="$render_node"
+    export LD_LIBRARY_PATH="$patch_prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    monitor_mode=dual
+    use_patched_aquamarine=1
+    cat >"$monitor_conf" <<'EOF'
+monitor = DSI-2,preferred,0x0,1.0,transform,3
+monitor = DSI-1,preferred,0x0,1.0,transform,3
+monitor = HDMI-A-1,preferred,1280x0,1.0
+monitor = HDMI-A-2,preferred,1280x0,1.0
+monitor = ,preferred,auto,1
+cursor:no_hardware_cursors = true
+EOF
+elif [ -n "$hdmi_connector" ] && [ -n "$hdmi_card" ]; then
     export AQ_DRM_DEVICES="$hdmi_card"
     monitor_mode=hdmi
     cat >"$monitor_conf" <<'EOF'
-monitor = HDMI-A-1,preferred,0x0,1.12
-monitor = HDMI-A-2,preferred,0x0,1.12
+monitor = HDMI-A-1,preferred,0x0,1.0
+monitor = HDMI-A-2,preferred,0x0,1.0
 monitor = DSI-2,disable
 monitor = DSI-1,disable
 monitor = ,preferred,auto,1
@@ -62,9 +95,15 @@ fi
 
 {
     printf 'AQ_DRM_DEVICES=%s\n' "${AQ_DRM_DEVICES:-unset}"
+    printf 'AQ_RENDER_NODE=%s\n' "${AQ_RENDER_NODE:-unset}"
     printf 'MONITOR_MODE=%s\n' "$monitor_mode"
     printf 'MONITOR_CONF=%s\n' "$monitor_conf"
     printf 'HDMI_CONNECTOR=%s\n' "${hdmi_connector:-none}"
-} >"${XDG_RUNTIME_DIR:-/tmp}/uconsole-hyprland-wrapper.log"
+    printf 'PATCHED_AQUAMARINE=%s\n' "$use_patched_aquamarine"
+} >"$runtime_dir/uconsole-hyprland-wrapper.log"
+
+if [ "$use_patched_aquamarine" -eq 1 ]; then
+    exec "$dynamic_loader" --library-path "$LD_LIBRARY_PATH" /usr/bin/Hyprland "$@"
+fi
 
 exec /usr/bin/Hyprland "$@"
