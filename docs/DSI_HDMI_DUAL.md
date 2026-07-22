@@ -111,6 +111,16 @@ cd ~/uconsole-hyprland-dotfiles
 ./scripts/install.sh
 ```
 
+El instalador completo realiza ambos pasos y también instala las dependencias:
+
+```sh
+./install.sh
+```
+
+La compilación es incremental al repetirla. Una fuente nueva parte exactamente
+de Aquamarine 0.11.0; una fuente ya parcheada debe descender de esa revisión y
+contener el parche completo.
+
 El script no instala nada en `/usr`. Si encuentra una fuente con cambios
 locales desconocidos, se detiene en vez de borrarlos.
 

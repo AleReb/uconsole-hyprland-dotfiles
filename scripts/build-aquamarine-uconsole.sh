@@ -3,7 +3,7 @@
 
 set -eu
 
-repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 source_dir=${UCONSOLE_AQUAMARINE_SOURCE:-"$HOME/.local/src/aquamarine-uconsole"}
 build_dir=${UCONSOLE_AQUAMARINE_BUILD:-"$source_dir/build-uconsole"}
 install_prefix=${UCONSOLE_AQUAMARINE_PREFIX:-"$HOME/.local/opt/aquamarine-0.11-uconsole"}
@@ -11,7 +11,7 @@ patch_file="$repo_root/patches/aquamarine-0.11-uconsole-render-node.patch"
 upstream_url=https://github.com/hyprwm/aquamarine.git
 base_commit=cd8321eba285e3cce50c50f19d5174a0b2567297
 
-for command_name in git cmake pkg-config; do
+for command_name in git cmake ninja pkg-config; do
     command -v "$command_name" >/dev/null 2>&1 || {
         printf 'Falta el comando requerido: %s\n' "$command_name" >&2
         exit 1
@@ -35,6 +35,14 @@ else
 fi
 
 if git -C "$source_dir" apply --reverse --check "$patch_file" 2>/dev/null; then
+    current_commit=$(git -C "$source_dir" rev-parse HEAD)
+    git -C "$source_dir" merge-base --is-ancestor "$base_commit" "$current_commit" || {
+        printf 'La fuente parcheada no desciende de Aquamarine 0.11.0: %s\n' "$current_commit" >&2
+        exit 1
+    }
+    if [ "$current_commit" != "$base_commit" ]; then
+        printf 'La fuente parcheada conserva una revision descendiente de 0.11.0: %s\n' "$current_commit"
+    fi
     printf 'El parche uConsole ya esta aplicado.\n'
 else
     if ! git -C "$source_dir" diff --quiet || ! git -C "$source_dir" diff --cached --quiet; then

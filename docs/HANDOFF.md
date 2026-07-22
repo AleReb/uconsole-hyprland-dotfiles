@@ -49,6 +49,30 @@ pkg-config
 build-essential
 ```
 
+Build packages installed for the isolated Aquamarine display fix:
+
+```text
+build-essential
+cmake
+ninja-build
+pkg-config
+libegl-dev
+libgl-dev
+libgles-dev
+libwayland-dev
+wayland-protocols
+libseat-dev
+libinput-dev
+libhyprutils-dev
+libpixman-1-dev
+libdrm-dev
+libgbm-dev
+libudev-dev
+libdisplay-info-dev
+hyprwayland-scanner
+hwdata
+```
+
 ## Main Files
 
 ```text
@@ -66,10 +90,16 @@ build-essential
 ~/.local/bin/uconsole-cpu-load
 ~/.local/bin/uconsole-gpu-load
 ~/.local/bin/uconsole-theme
+~/.local/bin/uconsole-display-autoswitch
+~/.local/bin/uconsole-display-debug
+~/.local/bin/uconsole-display-switch
+~/.local/bin/uconsole-hyprland-mgpu
 ~/.local/bin/start-hyprland
 ~/.local/bin/Hyprland
+~/.local/bin/Hyprland-mgpu
 ~/.local/bin/swww
 ~/.local/bin/swww-daemon
+~/.local/opt/aquamarine-0.11-uconsole/lib/libaquamarine.so.10
 /etc/keyd/default.conf
 ```
 
@@ -122,6 +152,12 @@ Full install:
 cd ~/uconsole-hyprland-dotfiles
 ./install.sh
 ```
+
+The full installer automatically builds and installs the isolated Aquamarine
+fix before copying the launch wrappers. It enables `trixie-backports` from
+`apt/trixie-backports.sources` only when no backports source is already
+configured. `scripts/install.sh` remains the dotfiles-only path and does not
+compile it.
 
 Copy only dotfiles, launch wrappers, and bundled local binaries:
 

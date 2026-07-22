@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 BACKUP="$HOME/.config/cfg_backups/uconsole-dotfiles-$(date +%Y%m%d-%H%M%S)"
 
 need_cmd() {

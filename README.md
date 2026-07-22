@@ -23,14 +23,22 @@ Portable Debian 13 / Raspberry Pi CM5 Hyprland setup for the ClockworkPi uConsol
 On a clean uConsole running Debian 13:
 
 ```sh
-git clone <repo-url>
+git clone https://github.com/AleReb/uconsole-hyprland-dotfiles.git
 cd ~/uconsole-hyprland-dotfiles
 ./install.sh
 ```
 
 Then log out and choose the `Hyprland` session in LightDM. For direct boot, configure LightDM autologin to the `hyprland` session.
 
-This profile installs two local launch wrappers:
+The full installer enables Debian `trixie-backports` when needed, installs the
+Aquamarine build dependencies, checks out the exact Aquamarine 0.11.0 revision,
+applies the uConsole patch, and installs the result under
+`~/.local/opt/aquamarine-0.11-uconsole/`. It does not replace the Debian
+library. Running the installer again is safe: the existing patched source must
+descend from that revision, the complete patch is recognized, and the library
+is rebuilt incrementally.
+
+The normal graphical launch uses two local wrappers:
 
 ```text
 ~/.local/bin/start-hyprland
@@ -97,6 +105,13 @@ If packages are already installed and you only want to copy dotfiles:
 
 ```sh
 ./scripts/install.sh
+```
+
+That shorter command intentionally does not compile Aquamarine. To rebuild
+only the isolated display fix, run:
+
+```sh
+./scripts/build-aquamarine-uconsole.sh
 ```
 
 ## Main Shortcuts
