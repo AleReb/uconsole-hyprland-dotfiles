@@ -15,6 +15,8 @@ Portable Debian 13 / Raspberry Pi CM5 Hyprland setup for the ClockworkPi uConsol
 - Animated GIF wallpapers through the bundled ARM64 `swww` binaries.
 - Persistent GIF optimization helpers for faster boot wallpaper loading.
 - Hyprland launch wrappers that keep DSI active and support HDMI hotplug without restarting the session.
+- Early-boot and AC/battery CPU frequency policy for USB-backed startup stability.
+- AXP battery status with voltage, power flow, and time estimate in Waybar.
 - PipeWire volume keys with optional software boost up to 200%.
 - Compact `fastfetch` once per graphical login session.
 
@@ -28,7 +30,17 @@ cd ~/uconsole-hyprland-dotfiles
 ./install.sh
 ```
 
-Then log out and choose the `Hyprland` session in LightDM. For direct boot, configure LightDM autologin to the `hyprland` session.
+The installer does not enable a display manager or change the system's default
+boot target. From TTY, start the validated graphical session manually with:
+
+```sh
+start-hyprland
+```
+
+During early boot the CPU is capped at 1.8 GHz to reduce demand while USB-backed
+filesystems are checked and mounted. After Hyprland has been stable for ten
+seconds, the dynamic policy permits 2.4 GHz while discharging and the configured
+3 GHz ceiling while external power is present.
 
 The full installer enables Debian `trixie-backports` when needed, installs the
 Aquamarine build dependencies, checks out the exact Aquamarine 0.11.0 revision,
@@ -47,7 +59,19 @@ The normal graphical launch uses two local wrappers:
 
 `~/.local/bin/start-hyprland` delegates to `/usr/bin/start-hyprland` with `--path ~/.local/bin/Hyprland`. `~/.local/bin/Hyprland` resolves both KMS cards and writes `~/.cache/hypr/uconsole-monitors.conf`. When the isolated Aquamarine fix is available, it opens DSI and HDMI at startup even if the HDMI connector is currently unplugged. That makes later connect/disconnect events work without restarting Hyprland. Both cards share the single V3D render node. If the fix is unavailable, the wrapper keeps the previous single-output recovery paths instead of leaving both screens black. Keep this wrapper startup-only: do not add `DRI_PRIME` or `WLR_RENDER_DRM_DEVICE`; those paths caused high CPU on this uConsole profile.
 
-HDMI connect/disconnect is checked by `uconsole-display-autoswitch`. In the patched `dual` mode it never closes Hyprland; on reconnection it asks `uconsole-wallpaper` to restore only the new HDMI output. Session restart remains only as a recovery fallback when the patched multi-card backend is unavailable. `Super + Shift + H` reports or applies that fallback manually.
+HDMI connect/disconnect is checked by `uconsole-display-autoswitch`. In the
+patched `dual` mode it never closes Hyprland. After a topology change it
+refreshes Waybar so its layer surfaces follow Kanshi's layout; on reconnection
+it first restores a lightweight poster on HDMI and loads the animated GIF in
+the background. Session restart remains only as a recovery fallback when the
+patched multi-card backend is unavailable. `Super + Shift + H` reports or
+applies that fallback manually.
+
+Output mode, scale, rotation, and logical position are applied by `kanshi`
+from `~/.config/kanshi/config`. The wrapper's monitor rules remain as a safe
+startup fallback; once the session is ready, Kanshi applies the saved profile
+and reapplies it when the connected output set changes. After editing the
+profile while Kanshi is running, reload it with `pkill -HUP -x kanshi`.
 
 For a read-only display report from either Hyprland or Xorg, run:
 

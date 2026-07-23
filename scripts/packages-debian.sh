@@ -25,7 +25,7 @@ sudo apt update
 sudo apt install -y \
     git waybar wofi foot swaybg keyd cava fastfetch ffmpeg \
     yad liblz4-1 libxxhash0 bluez blueman \
-    wl-clipboard playerctl pavucontrol network-manager-gnome wev
+    wl-clipboard playerctl pavucontrol network-manager-gnome wev kanshi
 
 sudo apt install -y -t trixie-backports \
     hyprland uwsm xdg-desktop-portal-hyprland \

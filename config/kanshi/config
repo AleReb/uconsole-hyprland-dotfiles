@@ -1,0 +1,16 @@
+profile {
+		output DSI-2 enable scale 1.000000 mode 720x1280@59.901 position 1440,0 transform 270
+		output HDMI-A-1 enable scale 1.000000 mode 1440x900@59.901 position 0,0 transform normal
+}
+
+profile {
+		output DSI-2 enable scale 1.000000 mode 720x1280@59.901 position 0,0 transform 270
+}
+
+profile {
+		output DSI-1 enable scale 1.000000 mode 720x1280@59.901 position 0,0 transform 270
+}
+
+profile {
+		output DSI-1 enable scale 1.000000 mode 480x1280@60.000 position 0,0 transform 270
+}

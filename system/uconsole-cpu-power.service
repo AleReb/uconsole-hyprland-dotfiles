@@ -1,0 +1,12 @@
+[Unit]
+Description=uConsole dynamic CPU power policy
+After=uconsole-cpu-boot-cap.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/uconsole-cpu-power
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

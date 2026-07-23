@@ -77,6 +77,7 @@ hwdata
 
 ```text
 ~/.config/hypr/hyprland.conf
+~/.config/kanshi/config
 ~/.config/waybar/config
 ~/.config/waybar/style.css
 ~/.config/gtk-3.0/gtk.css
@@ -89,6 +90,7 @@ hwdata
 ~/.local/bin/uconsole-waybar-restart
 ~/.local/bin/uconsole-cpu-load
 ~/.local/bin/uconsole-gpu-load
+~/.local/bin/uconsole-battery-status
 ~/.local/bin/uconsole-theme
 ~/.local/bin/uconsole-display-autoswitch
 ~/.local/bin/uconsole-display-debug
@@ -100,16 +102,28 @@ hwdata
 ~/.local/bin/swww
 ~/.local/bin/swww-daemon
 ~/.local/opt/aquamarine-0.11-uconsole/lib/libaquamarine.so.10
+/usr/local/sbin/uconsole-cpu-boot-cap
+/usr/local/sbin/uconsole-cpu-power
+/etc/systemd/system/uconsole-cpu-boot-cap.service
+/etc/systemd/system/uconsole-cpu-power.service
 /etc/keyd/default.conf
 ```
 
 ## Technical Decisions
 
 - Active state observed on 2026-06-14: the live desktop may have a generated theme and selected wallpaper. Those values are user state created by `uconsole-theme` and `uconsole-wallpaper`; the repo keeps portable defaults.
-- Graphical login: systemd should use `graphical.target`, LightDM should be enabled, and `/etc/lightdm/lightdm.conf` can use `autologin-user=uconsole`, `user-session=hyprland`, and `autologin-session=hyprland` for direct boot.
+- Graphical login: the installer leaves the default boot target and display-manager state unchanged. On this uConsole, TTY1 autologins as `uconsole`; run `start-hyprland` manually to enter the validated DSI/HDMI session.
+- CPU startup policy: `uconsole-cpu-boot-cap.service` limits the CPU to 1.8 GHz before local filesystem checks. `uconsole-cpu-power.service` keeps that limit through Hyprland startup, then permits 2.4 GHz on battery or the configured 3 GHz ceiling on external power.
+- Battery status: Waybar runs `uconsole-battery-status` every ten seconds. It reads the AXP power-supply sysfs data and reports state, capacity, voltage, battery power flow, and an estimated remaining/charging time.
 - Launch wrappers: `~/.local/bin/start-hyprland` should remain a thin wrapper around `/usr/bin/start-hyprland --path "$HOME/.local/bin/Hyprland"`. `~/.local/bin/Hyprland` resolves both KMS cards, writes `~/.cache/hypr/uconsole-monitors.conf`, loads the isolated library through the ARM64 dynamic loader, and then execs `/usr/bin/Hyprland`.
 - HDMI/DRM: the validated profile opens DSI and HDMI through their separate KMS cards and the sole V3D render node even when HDMI is unplugged at startup. This is required for true hotplug later in the same session. It loads the isolated patched Aquamarine library documented in `docs/DSI_HDMI_DUAL.md`; if the patch is missing it falls back to the old single-output paths. Do not add `DRI_PRIME` or `WLR_RENDER_DRM_DEVICE`.
-- HDMI/DSI switching: in patched `dual` mode, `uconsole-display-autoswitch` only watches connector transitions and restores the wallpaper on a reconnected HDMI output. It must not call `hyprctl dispatch exit`. `uconsole-display-switch` retains restart behavior solely for the unpatched recovery path. `Super + Shift + H` remains a manual fallback.
+- HDMI/DSI switching: in patched `dual` mode, `uconsole-display-autoswitch`
+  watches connector transitions, refreshes Waybar after Kanshi changes the
+  layout, and restores a reconnected HDMI wallpaper without blocking on the
+  animated GIF. It must not call `hyprctl dispatch exit`.
+  `uconsole-display-switch` retains session-restart behavior solely for the
+  unpatched recovery path. `Super + Shift + H` remains a manual fallback.
+- Monitor layout: `kanshi` starts with Hyprland and applies `~/.config/kanshi/config` after the wrapper's safe fallback rules. The validated dual profile places HDMI at `0x0` and rotated DSI at `1440x0`. Reload an edited Kanshi profile with `pkill -HUP -x kanshi`; do not move layout policy into the Aquamarine patch or the hotplug watcher.
 - Wallpapers: static images use `swaybg`; GIF uses `swww`. Video wallpapers are intentionally unsupported on this device profile.
 - `swww` was built locally from `~/src/swww` with stable Rust and installed as `~/.local/bin/swww` plus `~/.local/bin/swww-daemon`. The repo also includes those ARM64 binaries under `bin/`.
 - GIF optimization: `scripts/optimize-wallpaper-gifs.sh` creates persistent `*.swww.png` posters and `*.swww.gif` optimized copies when they are smaller than the original. `uconsole-wallpaper` keeps state pointing at the original GIF, loads the poster first to avoid a black boot screen, and then loads the optimized GIF in the background. `uconsole-wallpaper output NAME` restores only a newly hotplugged output. The picker hides generated sidecars.
@@ -138,7 +152,7 @@ hwdata
 
 ## Recommended Follow-Up
 
-- Reboot once and confirm LightDM autologin reaches Hyprland without manual intervention.
+- Reboot once, confirm TTY1 autologin, and run `start-hyprland` manually.
 - Keep at least one static PNG wallpaper as a fallback for boot or low-battery situations.
 - Commit the bundled binary update together with `docs/THIRD_PARTY.md` so the repo clearly documents what was built.
 - If disk space matters, remove local build trees such as `~/src/swww` only after confirming the bundled `bin/swww` and `bin/swww-daemon` work from a fresh install.

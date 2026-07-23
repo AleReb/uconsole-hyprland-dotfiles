@@ -46,6 +46,26 @@ hdmi_state() {
     printf 'disconnected\n'
 }
 
+refresh_waybar() {
+    helper=/home/uconsole/.local/bin/uconsole-waybar-restart
+    sleep 1
+    if pkill -USR2 -x waybar >/dev/null 2>&1; then
+        log "waybar-reloaded"
+        return 0
+    fi
+
+    [ -x "$helper" ] || {
+        log "waybar-refresh-skipped helper-missing"
+        return 0
+    }
+
+    if "$helper"; then
+        log "waybar-restarted"
+    else
+        log "waybar-restart-failed"
+    fi
+}
+
 last_state=$(hdmi_state)
 log "started mode=hotplug state=$last_state"
 
@@ -64,6 +84,7 @@ while :; do
                 fi
                 ;;
         esac
+        refresh_waybar
         last_state=$state
     fi
     sleep 2

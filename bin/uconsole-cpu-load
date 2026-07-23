@@ -24,4 +24,6 @@ else
     usage=$(( (100 * (diff_total - diff_idle)) / diff_total ))
 fi
 
-printf 'C %s%%\n' "$usage"
+freq=$(cat /sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq 2>/dev/null || echo 0)
+freq_mhz=$((freq / 1000))
+printf '{"text": "C %s%%", "tooltip": "Frecuencia CPU: %s MHz"}\n' "$usage" "$freq_mhz"

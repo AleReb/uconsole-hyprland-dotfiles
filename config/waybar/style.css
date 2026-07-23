@@ -28,7 +28,7 @@ tooltip label {
 #temperature,
 #pulseaudio,
 #bluetooth,
-#battery,
+#custom-battery,
 #tray {
   background: rgba(31, 35, 40, 0.92);
   border: 1px solid #c79bf0;
@@ -53,16 +53,16 @@ tooltip label {
 #temperature,
 #pulseaudio,
 #bluetooth,
-#battery,
+#custom-battery,
 #tray {
   padding: 0 10px;
 }
 
-#battery.warning {
+#custom-battery.warning {
   color: #facc15;
 }
 
-#battery.critical,
+#custom-battery.critical,
 #temperature.critical {
   color: #f87171;
 }

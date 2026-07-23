@@ -1,0 +1,13 @@
+[Unit]
+Description=uConsole early-boot CPU power cap
+DefaultDependencies=no
+After=systemd-modules-load.service systemd-udev-trigger.service
+Before=local-fs-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/uconsole-cpu-boot-cap
+RemainAfterExit=yes
+
+[Install]
+WantedBy=local-fs-pre.target

@@ -1,3 +1,10 @@
 #!/bin/sh
+
 pkill -x waybar >/dev/null 2>&1 || true
-exec waybar
+setsid -f env GDK_BACKEND=wayland,x11 QT_QPA_PLATFORM=wayland waybar
+
+# Tray clients can stay alive while the tray host was recreated, especially
+# after HDMI output changes. Re-register Blueman after Waybar is back.
+sleep 1
+pkill -f '/usr/bin/blueman-applet' >/dev/null 2>&1 || true
+setsid -f blueman-applet

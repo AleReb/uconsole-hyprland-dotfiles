@@ -4,14 +4,16 @@ state="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole/gpu.stat"
 mkdir -p "$(dirname "$state")"
 
 [ -r "$stats" ] || {
-    printf 'G n/a\n'
+    printf '{"text": "G n/a", "tooltip": "Estadisticas GPU no disponibles"}\n'
     exit 0
 }
 
 line="$(awk 'NR == 2 { print $2, $4 }' "$stats")"
-set -- $line
-timestamp="${1:-0}"
-runtime="${2:-0}"
+read -r timestamp runtime <<EOF
+$line
+EOF
+timestamp="${timestamp:-0}"
+runtime="${runtime:-0}"
 
 if [ -r "$state" ]; then
     read -r prev_timestamp prev_runtime < "$state" || true
@@ -31,4 +33,4 @@ else
     [ "$usage" -gt 100 ] && usage=100
 fi
 
-printf 'G %s%%\n' "$usage"
+printf '{"text": "G %s%%", "tooltip": "Carga GPU: %s%%"}\n' "$usage" "$usage"

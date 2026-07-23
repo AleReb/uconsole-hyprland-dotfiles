@@ -1,0 +1,66 @@
+#!/bin/bash
+# Keep boot/session startup conservative, then apply the existing AC/battery
+# performance policy after Hyprland has remained alive for a short grace period.
+
+set -u
+
+readonly user_name=uconsole
+readonly boot_limit_khz=1800000
+readonly battery_limit_khz=2400000
+readonly ac_limit_khz=3000000
+readonly hyprland_grace_seconds=10
+
+hyprland_seen_at=
+last_limit=
+
+set_limit() {
+    local requested=$1
+    local policy limit_file current
+
+    for policy in /sys/devices/system/cpu/cpufreq/policy*; do
+        limit_file="$policy/scaling_max_freq"
+        [[ -w "$limit_file" ]] || continue
+        current=$(<"$limit_file")
+        if [[ "$current" != "$requested" ]]; then
+            printf '%s\n' "$requested" >"$limit_file"
+        fi
+    done
+
+    if [[ "$last_limit" != "$requested" ]]; then
+        logger -t uconsole-cpu-power "CPU maximum set to $((requested / 1000)) MHz"
+        last_limit=$requested
+    fi
+}
+
+hyprland_running() {
+    pgrep -u "$user_name" -f '/usr/bin/Hyprland([[:space:]]|$)' >/dev/null 2>&1
+}
+
+set_limit "$boot_limit_khz"
+
+while true; do
+    requested=$boot_limit_khz
+
+    if hyprland_running; then
+        if [[ -z "$hyprland_seen_at" ]]; then
+            hyprland_seen_at=$SECONDS
+        fi
+
+        if (( SECONDS - hyprland_seen_at >= hyprland_grace_seconds )); then
+            status=$(sed -n '1p' /sys/class/power_supply/axp20x-battery/status 2>/dev/null || true)
+            case "$status" in
+                Charging|Full|'Not charging')
+                    requested=$ac_limit_khz
+                    ;;
+                *)
+                    requested=$battery_limit_khz
+                    ;;
+            esac
+        fi
+    else
+        hyprland_seen_at=
+    fi
+
+    set_limit "$requested"
+    sleep 3
+done

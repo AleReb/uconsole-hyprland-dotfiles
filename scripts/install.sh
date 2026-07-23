@@ -17,7 +17,7 @@ need_cmd mkdir
 
 mkdir -p "$BACKUP"
 
-for dir in hypr waybar wofi foot dunst uconsole gtk-3.0; do
+for dir in hypr waybar wofi foot dunst uconsole gtk-3.0 kanshi; do
     if [ -e "$HOME/.config/$dir" ]; then
         cp -a "$HOME/.config/$dir" "$BACKUP/"
     fi
@@ -53,6 +53,7 @@ cp -a "$ROOT/config/foot" "$HOME/.config/"
 cp -a "$ROOT/config/dunst" "$HOME/.config/"
 cp -a "$ROOT/config/uconsole" "$HOME/.config/"
 cp -a "$ROOT/config/gtk-3.0" "$HOME/.config/"
+cp -a "$ROOT/config/kanshi" "$HOME/.config/"
 cp -a "$ROOT/config/brightness_osd.sh" "$HOME/.config/"
 cp -a "$ROOT/config/volume_osd.sh" "$HOME/.config/"
 chmod +x "$HOME/.config/brightness_osd.sh" "$HOME/.config/volume_osd.sh"
@@ -73,6 +74,16 @@ done
 rm -f "$HOME/.local/bin/uconsole-hypr-hotplug" \
     "$HOME/.local/bin/Hyprland.drm-wrapper.bak" \
     "$HOME/.local/bin/startx-hyprland"
+
+if [ -d "$ROOT/system" ]; then
+    printf 'Installing CPU power policy requires sudo.\n'
+    sudo install -m 0755 "$ROOT/system/uconsole-cpu-boot-cap" /usr/local/sbin/uconsole-cpu-boot-cap
+    sudo install -m 0755 "$ROOT/system/uconsole-cpu-power" /usr/local/sbin/uconsole-cpu-power
+    sudo install -m 0644 "$ROOT/system/uconsole-cpu-boot-cap.service" /etc/systemd/system/uconsole-cpu-boot-cap.service
+    sudo install -m 0644 "$ROOT/system/uconsole-cpu-power.service" /etc/systemd/system/uconsole-cpu-power.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable uconsole-cpu-boot-cap.service uconsole-cpu-power.service
+fi
 
 if [ -f "$ROOT/keyd/default.conf" ]; then
     sudo install -m 0644 "$ROOT/keyd/default.conf" /etc/keyd/default.conf
@@ -96,4 +107,4 @@ EOF
 fi
 
 printf 'Installed. Backup: %s\n' "$BACKUP"
-printf 'Choose the Hyprland session from LightDM, or use LightDM autologin for direct boot.\n'
+printf 'From TTY, run start-hyprland to enter Hyprland.\n'

@@ -11,4 +11,4 @@ printf 'You may be asked for sudo.\n\n'
 "$ROOT/scripts/build-aquamarine-uconsole.sh"
 "$ROOT/scripts/install.sh"
 
-printf '\nDone. Log out and choose the Hyprland session from LightDM.\n'
+printf '\nDone. From TTY, run start-hyprland to enter Hyprland.\n'

@@ -13,9 +13,10 @@ El lanzador normal `bin/Hyprland` inicia:
 - solamente HDMI como recuperación si HDMI está conectado pero faltan los
   prerrequisitos del modo dual.
 
-DSI siempre conserva escala `1.0` y `transform 3`. En modo dual, HDMI usa
-escala `1.0` y comienza en `1280x0`, a la derecha del escritorio lógico de la
-pantalla interna.
+DSI siempre conserva escala `1.0` y `transform 3`. Las reglas generadas por el
+wrapper dejan inicialmente HDMI en `1280x0` como recuperación segura. Después
+del arranque, Kanshi aplica `~/.config/kanshi/config`; el perfil validado deja
+HDMI en `0x0` y DSI en `1440x0`, de modo que HDMI queda a la izquierda.
 
 No se reemplazan `/usr/bin/Hyprland` ni la biblioteca Aquamarine de Debian. La
 variante corregida se instala aisladamente bajo
@@ -204,7 +205,31 @@ wallpaper-restored output=HDMI-A-1
 ```
 
 `uconsole-display-autoswitch` no debe cerrar Hyprland en este perfil. El
-reinicio queda reservado al fallback cuando falta la biblioteca corregida.
+reinicio de la sesión queda reservado al fallback cuando falta la biblioteca
+corregida. Kanshi configura modo, escala, rotación y posición; después de cada
+cambio de topología, el autoswitch recarga Waybar con `SIGUSR2` para que sus
+capas sigan la nueva geometría. El reinicio completo queda en
+`Super+Shift+B`. Al reconectar HDMI carga primero el poster y espera diez
+segundos antes de cargar el GIF pesado en segundo plano, evitando bloquear el
+repintado de DSI.
+
+### Revalidación con Kanshi y Waybar
+
+El 23 de julio de 2026 se repitió físicamente el ciclo después de añadir
+Kanshi. DSI permaneció visible y Waybar reapareció sin usar
+`Super+Shift+B`. El registro confirmó:
+
+```text
+hotplug old=connected:HDMI-A-1 new=disconnected
+waybar-reloaded
+hotplug old=disconnected new=connected:HDMI-A-1
+wallpaper-restored output=HDMI-A-1
+waybar-reloaded
+```
+
+Si HDMI vuelve a desconectarse antes de los diez segundos de espera, el
+cargador diferido del GIF detecta que la salida desapareció y termina sin
+tratarlo como un fallo.
 
 ## Evidencia de la validación
 
