@@ -1,0 +1,121 @@
+#!/bin/sh
+set -u
+
+state_dir="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole"
+thumbnail_dir="$state_dir/wallpaper-thumbnails"
+error_dir="$state_dir/wallpaper-prepare-errors"
+report="$state_dir/wallpaper-prepare-report.tsv"
+wall_dirs="${UCONSOLE_WALLPAPER_DIRS:-$HOME/.local/share/wallpapers $HOME/Pictures/Wallpapers}"
+fps="${UCONSOLE_WALLPAPER_FPS:-12}"
+width="${UCONSOLE_WALLPAPER_WIDTH:-1600}"
+crf="${UCONSOLE_WALLPAPER_CRF:-18}"
+
+mkdir -p "$state_dir" "$thumbnail_dir" "$error_dir"
+
+command -v ffmpeg >/dev/null 2>&1 || {
+    printf 'Missing command: ffmpeg\n' >&2
+    exit 2
+}
+
+poster_file() {
+    image="$1"
+    dir="$(dirname "$image")"
+    base="$(basename "$image" .gif)"
+    case "$base" in *.GIF) base="$(basename "$image" .GIF)" ;; esac
+    printf '%s/%s.swww.png\n' "$dir" "$base"
+}
+
+cache_key() {
+    printf '%s' "$1" | cksum | awk '{ print $1 }'
+}
+
+thumbnail_file() {
+    image="$1"
+    modified="$(stat -c '%Y' "$image" 2>/dev/null || printf '0')"
+    key="$(printf '%s:%s' "$image" "$modified" | cksum | awk '{ print $1 }')"
+    printf '%s/%s.png\n' "$thumbnail_dir" "$key"
+}
+
+report_result() {
+    printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$report"
+}
+
+prepare_one() {
+    image="$1"
+    key="$(cache_key "$image")"
+    error_log="$error_dir/$key.log"
+    poster="$(poster_file "$image")"
+    thumb="$(thumbnail_file "$image")"
+    cache="$state_dir/wallpaper-$key-${fps}fps-${width}w-crf${crf}.mp4"
+
+    printf 'CHECK %s\n' "$image"
+    if ! ffmpeg -nostdin -v error -i "$image" -f null - >"$error_log" 2>&1; then
+        report_result FAIL "$image" "GIF decode failed; see $error_log"
+        printf 'FAIL  %s\n' "$image" >&2
+        return 0
+    fi
+    rm -f "$error_log"
+
+    if [ ! -f "$poster" ] || [ "$image" -nt "$poster" ]; then
+        tmp="$poster.tmp.$$.png"
+        if ! ffmpeg -nostdin -y -v error -i "$image" -frames:v 1 -update 1 "$tmp" >"$error_log" 2>&1; then
+            rm -f "$tmp"
+            report_result FAIL "$image" "poster creation failed; see $error_log"
+            printf 'FAIL  %s (poster)\n' "$image" >&2
+            return 0
+        fi
+        mv -f "$tmp" "$poster"
+    fi
+
+    if [ ! -f "$thumb" ]; then
+        tmp="$thumb.tmp.$$.png"
+        if ! ffmpeg -nostdin -y -v error -i "$image" -frames:v 1 \
+            -vf "scale=170:96:force_original_aspect_ratio=decrease,pad=170:96:(ow-iw)/2:(oh-ih)/2:color=0x101419" \
+            "$tmp" >"$error_log" 2>&1; then
+            rm -f "$tmp"
+            report_result FAIL "$image" "thumbnail creation failed; see $error_log"
+            printf 'FAIL  %s (thumbnail)\n' "$image" >&2
+            return 0
+        fi
+        mv -f "$tmp" "$thumb"
+    fi
+
+    if [ ! -s "$cache" ] || [ "$image" -nt "$cache" ]; then
+        tmp="$cache.tmp.$$.mp4"
+        if ! ffmpeg -nostdin -y -v error -i "$image" \
+            -vf "fps=${fps},scale='trunc(min(${width},iw)/2)*2':-2:flags=lanczos" \
+            -an -c:v libx264 -preset medium -crf "$crf" -pix_fmt yuv420p -movflags +faststart \
+            "$tmp" >"$error_log" 2>&1; then
+            rm -f "$tmp"
+            report_result FAIL "$image" "MP4 conversion failed; see $error_log"
+            printf 'FAIL  %s (MP4)\n' "$image" >&2
+            return 0
+        fi
+        mv -f "$tmp" "$cache"
+    fi
+
+    report_result READY "$image" "poster=$poster thumbnail=$thumb cache=$cache"
+    printf 'READY %s\n' "$image"
+}
+
+if [ "${1:-}" = "--one" ]; then
+    [ -n "${2:-}" ] || exit 2
+    : > "$report"
+    prepare_one "$2"
+else
+    printf 'status\tfile\tdetail\n' > "$report"
+    list_file="$(mktemp "$state_dir/wallpaper-prepare.XXXXXX")"
+    trap 'rm -f "$list_file"' EXIT HUP INT TERM
+    for dir in $wall_dirs; do
+        [ -d "$dir" ] || continue
+        find "$dir" -maxdepth 1 -type f -iname '*.gif' ! -iname '*.swww.gif' -print >> "$list_file"
+    done
+    while IFS= read -r image; do
+        prepare_one "$image"
+    done < "$list_file"
+fi
+
+failed="$(awk -F '\t' '$1 == "FAIL" { count++ } END { print count + 0 }' "$report")"
+ready="$(awk -F '\t' '$1 == "READY" { count++ } END { print count + 0 }' "$report")"
+printf 'Summary: ready=%s failed=%s report=%s\n' "$ready" "$failed" "$report"
+[ "$failed" -eq 0 ]

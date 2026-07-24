@@ -1,0 +1,75 @@
+#!/bin/sh
+set -eu
+
+PATH="$HOME/.local/bin:$PATH"
+
+state_dir="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole"
+state_file="$state_dir/wallpaper"
+lock_background="$state_dir/lock-wallpaper.png"
+tmp_background="$lock_background.tmp.$$.png"
+
+mkdir -p "$state_dir"
+
+current_wallpaper() {
+    cat "$state_file" 2>/dev/null || true
+}
+
+prepare_background() {
+    wallpaper="$(current_wallpaper)"
+    [ -f "$wallpaper" ] || return 0
+
+    case "$wallpaper" in
+        *.[Gg][Ii][Ff])
+            command -v ffmpeg >/dev/null 2>&1 || return 1
+            ffmpeg -y -v error -i "$wallpaper" -frames:v 1 -update 1 "$tmp_background"
+            mv -f "$tmp_background" "$lock_background"
+            ;;
+        *)
+            # Keep hyprlock on one stable PNG path even for a static desktop.
+            command -v magick >/dev/null 2>&1 || return 1
+            magick "$wallpaper[0]" "$tmp_background"
+            mv -f "$tmp_background" "$lock_background"
+            ;;
+    esac
+}
+
+case "${1:-lock}" in
+    prepare)
+        prepare_background
+        exit 0
+        ;;
+    lock)
+        ;;
+    *)
+        printf 'usage: %s [prepare|lock]\n' "$0" >&2
+        exit 2
+        ;;
+esac
+
+# A second request (for example, the hotkey while already locked) must not
+# start a competing locker or restore the animated wallpaper prematurely.
+pgrep -x hyprlock >/dev/null 2>&1 && exit 0
+
+animated=0
+case "$(current_wallpaper)" in
+    *.[Gg][Ii][Ff]) animated=1 ;;
+esac
+
+prepare_background || exit 1
+
+if [ "$animated" -eq 1 ]; then
+    swww kill >/dev/null 2>&1 || true
+    pkill -x mpvpaper >/dev/null 2>&1 || true
+    pkill -x cpulimit >/dev/null 2>&1 || true
+fi
+
+set +e
+hyprlock
+status=$?
+set -e
+
+if [ "$animated" -eq 1 ]; then
+    uconsole-wallpaper apply >/dev/null 2>&1 || true
+fi
+
+exit "$status"

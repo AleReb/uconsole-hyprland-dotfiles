@@ -124,9 +124,9 @@ hwdata
   `uconsole-display-switch` retains session-restart behavior solely for the
   unpatched recovery path. `Super + Shift + H` remains a manual fallback.
 - Monitor layout: `kanshi` starts with Hyprland and applies `~/.config/kanshi/config` after the wrapper's safe fallback rules. The validated dual profile places HDMI at `0x0` and rotated DSI at `1440x0`. Reload an edited Kanshi profile with `pkill -HUP -x kanshi`; do not move layout policy into the Aquamarine patch or the hotplug watcher.
-- Wallpapers: static images use `swaybg`; GIF uses `swww`. Video wallpapers are intentionally unsupported on this device profile.
-- `swww` was built locally from `~/src/swww` with stable Rust and installed as `~/.local/bin/swww` plus `~/.local/bin/swww-daemon`. The repo also includes those ARM64 binaries under `bin/`.
-- GIF optimization: `scripts/optimize-wallpaper-gifs.sh` creates persistent `*.swww.png` posters and `*.swww.gif` optimized copies when they are smaller than the original. `uconsole-wallpaper` keeps state pointing at the original GIF, loads the poster first to avoid a black boot screen, and then loads the optimized GIF in the background. `uconsole-wallpaper output NAME` restores only a newly hotplugged output. The picker hides generated sidecars.
+- Wallpapers: static images use `swaybg`; GIFs are converted once to cached MP4 at 12 FPS, up to 1600 px wide and CRF 18, then played by `mpvpaper`, pinned to CPU 3 with `nice 15` and `cpulimit` at 35% of one core. MP4 and WebM are also supported directly.
+- The repo includes ARM64 `mpvpaper` and `mpvpaper-holder` binaries under `bin/`; `scripts/build-mpvpaper.sh` rebuilds them when required.
+- GIF loading: `uconsole-wallpaper` generates a persistent first-frame `*.swww.png` poster when absent, keeps it visible while converting/starting `mpvpaper`, then removes it after playback begins. `uconsole-wallpaper output NAME` restarts the player after a newly hotplugged output so the animation spans the active layout. The picker hides generated sidecars.
 - Avoid `hyprpaper` for this device state. Testing showed `hyprctl hyprpaper wallpaper` could hang and create high CPU load.
 - uConsole display scale: DSI output uses native scale `1.0`; rotation remains at 270 degrees (`transform,3`). Cursor size 28 and the slightly larger Waybar/Foot/Wofi sizing remain independent of monitor scaling.
 - Theme management: `uconsole-theme` updates Hyprland, Waybar, GTK tooltip/calendar styling, Wofi, Foot, Dunst, and OSD colors.

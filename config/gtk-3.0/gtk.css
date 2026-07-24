@@ -11,10 +11,13 @@ tooltip label, .tooltip label {
 }
 
 #yad-calendar-widget,
-#yad-calendar-widget * {
-  font-size: 20px;
+#yad-calendar-widget *,
+calendar,
+calendar * {
+  font-size: 22px;
 }
 
-#yad-calendar-widget {
-  padding: 14px;
+#yad-calendar-widget,
+calendar {
+  padding: 16px;
 }

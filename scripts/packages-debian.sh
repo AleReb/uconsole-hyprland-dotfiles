@@ -23,7 +23,7 @@ fi
 
 sudo apt update
 sudo apt install -y \
-    git waybar wofi foot swaybg keyd cava fastfetch ffmpeg \
+    git waybar wofi foot swaybg keyd cava fastfetch ffmpeg imagemagick mpv libmpv2 cpulimit \
     yad liblz4-1 libxxhash0 bluez blueman \
     wl-clipboard playerctl pavucontrol network-manager-gnome wev kanshi
 

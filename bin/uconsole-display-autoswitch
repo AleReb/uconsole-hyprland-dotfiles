@@ -66,6 +66,26 @@ refresh_waybar() {
     fi
 }
 
+restore_internal_wallpaper() {
+    # Kanshi needs a moment to remove HDMI and activate the single-DSI profile.
+    attempt=1
+    while [ "$attempt" -le 8 ]; do
+        monitors=$(hyprctl monitors 2>/dev/null || true)
+        if printf '%s\n' "$monitors" | grep -q '^Monitor DSI-' && ! printf '%s\n' "$monitors" | grep -q '^Monitor HDMI-'; then
+            if /home/uconsole/.local/bin/uconsole-wallpaper apply; then
+                log "wallpaper-restored internal attempt=$attempt"
+                return 0
+            fi
+            log "wallpaper-restore-failed internal attempt=$attempt"
+        fi
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+
+    log "wallpaper-restore-timeout internal"
+    return 1
+}
+
 last_state=$(hdmi_state)
 log "started mode=hotplug state=$last_state"
 
@@ -81,6 +101,13 @@ while :; do
                     log "wallpaper-restored output=$output"
                 else
                     log "wallpaper-restore-failed output=$output"
+                fi
+                ;;
+            disconnected)
+                if restore_internal_wallpaper; then
+                    :
+                else
+                    log "wallpaper-restore-failed after-hdmi-disconnect"
                 fi
                 ;;
         esac

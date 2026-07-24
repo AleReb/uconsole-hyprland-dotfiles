@@ -65,7 +65,7 @@ for file in Hyprland Hyprland-mgpu start-hyprland; do
         chmod +x "$HOME/.local/bin/$file"
     fi
 done
-for file in swww swww-daemon; do
+for file in mpvpaper mpvpaper-holder swww swww-daemon; do
     if [ -f "$ROOT/bin/$file" ]; then
         cp -a "$ROOT/bin/$file" "$HOME/.local/bin/"
         chmod +x "$HOME/.local/bin/$file"

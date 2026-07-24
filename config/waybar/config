@@ -42,7 +42,7 @@
         "today": "<span color='#191724' background='#ebbcba'><b>{}</b></span>"
       }
     },
-    "on-click": "sh -c 'yad --calendar --width=520 --height=420 --fixed --no-buttons --title=Calendar >/dev/null 2>&1 &'"
+    "on-click": "sh -c 'yad --calendar --width=640 --height=520 --fixed --no-buttons --title=Calendar >/dev/null 2>&1 &'"
   },
   "pulseaudio": {
     "format": "VOL {volume}",

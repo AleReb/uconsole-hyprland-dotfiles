@@ -5,14 +5,20 @@ PATH="$HOME/.local/bin:$PATH"
 
 state_dir="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole"
 state_file="$state_dir/wallpaper"
+thumbnail_dir="$state_dir/wallpaper-thumbnails"
 config="$HOME/.config/hypr/hyprpaper.conf"
 swaybg_pid="$state_dir/swaybg.pid"
 log_file="$state_dir/wallpaper.log"
 wall_dirs="$HOME/.local/share/wallpapers $HOME/Pictures/Wallpapers /usr/share/hypr"
+animated_fps="${UCONSOLE_WALLPAPER_FPS:-12}"
+animated_cpu="${UCONSOLE_WALLPAPER_CPU:-3}"
+animated_limit="${UCONSOLE_WALLPAPER_LIMIT:-35}"
+animated_width="${UCONSOLE_WALLPAPER_WIDTH:-1600}"
+animated_crf="${UCONSOLE_WALLPAPER_CRF:-18}"
 wallpaper_backend="${UCONSOLE_WALLPAPER_BACKEND:-swww}"
 use_optimized_gifs="${UCONSOLE_WALLPAPER_OPTIMIZED_GIFS:-1}"
 
-mkdir -p "$state_dir"
+mkdir -p "$state_dir" "$thumbnail_dir"
 
 log_msg() {
     printf '%s %s\n' "$(date '+%F %T')" "$*" >> "$log_file" 2>/dev/null || true
@@ -24,14 +30,51 @@ list_wallpapers() {
         if [ "$dir" = "/usr/share/hypr" ]; then
             find "$dir" -maxdepth 1 -type f -iname 'wall*.png'
         else
-            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o \( -iname '*.png' ! -iname '*.swww.png' \) -o -iname '*.webp' -o \( -iname '*.gif' ! -iname '*.swww.gif' \) \)
+            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o \( -iname '*.png' ! -iname '*.swww.png' \) -o -iname '*.webp' -o \( -iname '*.gif' ! -iname '*.swww.gif' \) -o -iname '*.mp4' -o -iname '*.webm' \)
         fi
     done | sort -u
 }
 
+wallpaper_thumbnail() {
+    img="$1"
+    modified="$(stat -c '%Y' "$img" 2>/dev/null || printf '0')"
+    key="$(printf '%s:%s' "$img" "$modified" | cksum | awk '{ print $1 }')"
+    thumb="$thumbnail_dir/$key.png"
+
+    if [ ! -f "$thumb" ]; then
+        tmp="$thumb.tmp.$$.png"
+        if ! ffmpeg -y -v error -i "$img" -frames:v 1 \
+            -vf "scale=170:96:force_original_aspect_ratio=decrease,pad=170:96:(ow-iw)/2:(oh-ih)/2:color=0x101419" \
+            "$tmp" >/dev/null 2>&1; then
+            rm -f "$tmp"
+            return 1
+        fi
+        mv -f "$tmp" "$thumb"
+    fi
+
+    printf '%s\n' "$thumb"
+}
+
+thumbnail_entries() {
+    list_wallpapers | while IFS= read -r img; do
+        thumb="$(wallpaper_thumbnail "$img" 2>/dev/null || true)"
+        if [ -n "$thumb" ]; then
+            printf 'img:%s:text:%s\n' "$thumb" "$img"
+        else
+            printf '%s\n' "$img"
+        fi
+    done
+}
+
+generate_thumbnails() {
+    list_wallpapers | while IFS= read -r img; do
+        wallpaper_thumbnail "$img" >/dev/null 2>&1 || true
+    done
+}
+
 is_animated_wallpaper() {
     case "$1" in
-        *.[Gg][Ii][Ff]) return 0 ;;
+        *.[Gg][Ii][Ff]|*.[Mm][Pp]4|*.[Ww][Ee][Bb][Mm]) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -73,7 +116,6 @@ optimized_gif_file() {
 
 optimized_gif_poster_file() {
     img="$1"
-    [ "$use_optimized_gifs" = "1" ] || return 1
 
     case "$img" in
         *.swww.gif|*.SWWW.gif) poster="${img%.[Gg][Ii][Ff]}.png" ;;
@@ -87,7 +129,46 @@ optimized_gif_poster_file() {
             ;;
     esac
 
-    [ -f "$poster" ] && [ "$poster" -nt "$img" ] && printf '%s\n' "$poster"
+    if [ -f "$poster" ] && [ "$poster" -nt "$img" ]; then
+        printf '%s\n' "$poster"
+        return 0
+    fi
+
+    command -v ffmpeg >/dev/null 2>&1 || return 1
+    poster_tmp="$poster.tmp.$$.png"
+    if ! ffmpeg -y -v error -i "$img" -frames:v 1 -update 1 "$poster_tmp" >/dev/null 2>&1; then
+        rm -f "$poster_tmp"
+        return 1
+    fi
+    mv -f "$poster_tmp" "$poster"
+    printf '%s\n' "$poster"
+}
+
+animated_playback_file() {
+    img="$1"
+
+    if is_gif_wallpaper "$img" && command -v ffmpeg >/dev/null 2>&1; then
+        key="$(printf '%s' "$img" | cksum | awk '{ print $1 }')"
+        cache="$state_dir/wallpaper-$key-${animated_fps}fps-${animated_width}w-crf${animated_crf}.mp4"
+
+        if [ ! -s "$cache" ] || [ "$img" -nt "$cache" ]; then
+            log_msg "converting GIF fps=$animated_fps width=$animated_width crf=$animated_crf file=$img"
+            cache_tmp="$cache.tmp.$$.mp4"
+            if ! ffmpeg -y -v error -i "$img" \
+                -vf "fps=${animated_fps},scale='trunc(min(${animated_width},iw)/2)*2':-2:flags=lanczos" \
+                -an -c:v libx264 -preset medium -crf "$animated_crf" -pix_fmt yuv420p -movflags +faststart \
+                "$cache_tmp"; then
+                rm -f "$cache_tmp"
+                log_msg "GIF conversion failed file=$img"
+                return 1
+            fi
+            mv -f "$cache_tmp" "$cache"
+        fi
+
+        printf '%s\n' "$cache"
+    else
+        printf '%s\n' "$img"
+    fi
 }
 
 stop_legacy_wallpaper_processes() {
@@ -96,7 +177,69 @@ stop_legacy_wallpaper_processes() {
     fi
     pkill -x hyprpaper >/dev/null 2>&1 || true
     pkill -x swaybg >/dev/null 2>&1 || true
+    pkill -x mpvpaper >/dev/null 2>&1 || true
+    pkill -x cpulimit >/dev/null 2>&1 || true
+    pgrep -a mpv 2>/dev/null | awk '/uconsole-animated-wallpaper/ { print $1 }' | while read -r pid; do
+        kill "$pid" >/dev/null 2>&1 || true
+    done
     rm -f "$swaybg_pid"
+}
+
+start_static_poster() {
+    poster="$1"
+    [ -f "$poster" ] || return 1
+
+    stop_legacy_wallpaper_processes
+    swaybg -m fill -i "$poster" >/dev/null 2>&1 &
+    printf '%s\n' "$!" > "$swaybg_pid"
+}
+
+start_animated_wallpaper() {
+    img="$1"
+    poster_img=""
+
+    stop_legacy_wallpaper_processes
+    if is_gif_wallpaper "$img"; then
+        poster_img="$(optimized_gif_poster_file "$img" 2>/dev/null || true)"
+        [ -n "$poster_img" ] && start_static_poster "$poster_img" || true
+    fi
+    stop_swww_img_loaders
+    swww kill >/dev/null 2>&1 || true
+
+    command -v mpvpaper >/dev/null 2>&1 || {
+        log_msg "mpvpaper missing; cannot play $img"
+        return 1
+    }
+
+    play_file="$(animated_playback_file "$img")" || return 1
+    options="no-audio loop-file=inf panscan=1 osc=no input-vo-keyboard=no no-input-default-bindings vf=fps=${animated_fps} title=uconsole-animated-wallpaper"
+    attempt=1
+    while [ "$attempt" -le 2 ]; do
+        if command -v cpulimit >/dev/null 2>&1 && command -v taskset >/dev/null 2>&1; then
+            cpulimit -f -m -l "$animated_limit" -- nice -n 15 taskset -c "$animated_cpu" \
+                mpvpaper -o "$options" ALL "$play_file" >/dev/null 2>&1 &
+        elif command -v taskset >/dev/null 2>&1; then
+            nice -n 15 taskset -c "$animated_cpu" mpvpaper -f -o "$options" ALL "$play_file" >/dev/null 2>&1 &
+        else
+            nice -n 15 mpvpaper -f -o "$options" ALL "$play_file" >/dev/null 2>&1 &
+        fi
+
+        sleep 1
+        if pgrep -x mpvpaper >/dev/null 2>&1; then
+            pkill -x swaybg >/dev/null 2>&1 || true
+            rm -f "$swaybg_pid"
+            log_msg "mpvpaper started fps=$animated_fps width=$animated_width crf=$animated_crf cpu=$animated_cpu limit=$animated_limit file=$play_file"
+            return 0
+        fi
+
+        log_msg "mpvpaper start retry=$attempt file=$play_file"
+        pkill -x cpulimit >/dev/null 2>&1 || true
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+
+    log_msg "mpvpaper failed to start file=$play_file"
+    return 1
 }
 
 stop_swww_img_loaders() {
@@ -125,7 +268,11 @@ start_swww_background_load() {
         sleep "$delay"
         current="$(swww query 2>/dev/null || true)"
         case "$current" in
-            *"$img"*) exit 0 ;;
+            *"$img"*)
+                pkill -x hyprpaper >/dev/null 2>&1 || true
+                pkill -x swaybg >/dev/null 2>&1 || true
+                exit 0
+                ;;
         esac
         for attempt in 1 2 3; do
             if swww img "$img" --resize crop --transition-type none >/dev/null 2>&1; then
@@ -222,6 +369,13 @@ apply_swww_wallpaper() {
         poster_img="$(optimized_gif_poster_file "$img" 2>/dev/null || true)"
     fi
 
+    # Keep a real static layer visible before the daemon exists and until its
+    # asynchronous GIF upload succeeds. This avoids a black background at
+    # session startup and after unlocking.
+    if [ -n "$poster_img" ]; then
+        start_static_poster "$poster_img" || true
+    fi
+
     if ! swww query >/dev/null 2>&1; then
         setsid -f swww-daemon -q >/dev/null 2>&1
         ready=0
@@ -240,11 +394,10 @@ apply_swww_wallpaper() {
     fi
 
     if [ -n "$poster_img" ]; then
-        swww img "$poster_img" --resize crop --transition-type none >/dev/null 2>&1 || true
         stop_swww_img_loaders
         start_swww_background_load "$display_img" 0
         start_swww_background_load "$display_img" 20
-        log_msg "swww poster loaded $poster_img; background loading $display_img"
+        log_msg "static poster loaded $poster_img; background loading $display_img"
         return 0
     fi
 
@@ -282,9 +435,13 @@ apply_wallpaper() {
     [ -f "$img" ] || img="$HOME/.local/share/wallpapers/wall1.png"
     [ -f "$img" ] || exit 1
 
+    if is_animated_wallpaper "$img"; then
+        start_animated_wallpaper "$img"
+        return
+    fi
+
     if use_swww_for "$img"; then
         if apply_swww_wallpaper "$img"; then
-            stop_legacy_wallpaper_processes
             return 0
         fi
     fi
@@ -309,6 +466,11 @@ apply_wallpaper_output() {
     img="$(cat "$state_file" 2>/dev/null || sed -n 's/^wallpaper = ,//p' "$config" | head -n 1)"
     [ -f "$img" ] || img="$HOME/.local/share/wallpapers/wall1.png"
     [ -f "$img" ] || exit 1
+
+    if is_animated_wallpaper "$img"; then
+        apply_wallpaper "$img"
+        return
+    fi
 
     if ! use_swww_for "$img"; then
         apply_wallpaper "$img"
@@ -350,7 +512,9 @@ apply_wallpaper_output() {
 }
 
 pick_wallpaper() {
-    list_wallpapers | wofi --show dmenu --prompt "Wallpaper"
+    thumbnail_entries | wofi --show dmenu --prompt "Wallpaper" \
+        --allow-images --parse-search --define dmenu-parse_action=true \
+        --define image_size=96 --width 700 --height 620
 }
 
 cycle_wallpaper() {
@@ -389,6 +553,9 @@ case "${1:-select}" in
     current)
         cat "$state_file" 2>/dev/null || sed -n 's/^wallpaper = ,//p' "$config" | head -n 1
         ;;
+    thumbnails)
+        generate_thumbnails
+        ;;
     apply)
         apply_wallpaper "${2:-}"
         ;;
@@ -396,7 +563,7 @@ case "${1:-select}" in
         apply_wallpaper_output "${2:?missing output name}"
         ;;
     *)
-        printf 'usage: %s [select|next|prev|current|apply|output NAME|set PATH]\n' "$0" >&2
+        printf 'usage: %s [select|next|prev|current|thumbnails|apply|output NAME|set PATH]\n' "$0" >&2
         exit 2
         ;;
 esac

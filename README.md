@@ -12,7 +12,7 @@ Portable Debian 13 / Raspberry Pi CM5 Hyprland setup for the ClockworkPi uConsol
   - `open = leftmeta`, used as `Super`.
   - `unknown` as a dedicated wallpaper key.
 - Static wallpapers through `swaybg`.
-- Animated GIF wallpapers through the bundled ARM64 `swww` binaries.
+- Animated GIF wallpapers through bundled ARM64 `mpvpaper`, with a capped decoder.
 - Persistent GIF optimization helpers for faster boot wallpaper loading.
 - Hyprland launch wrappers that keep DSI active and support HDMI hotplug without restarting the session.
 - Early-boot and AC/battery CPU frequency policy for USB-backed startup stability.
@@ -59,7 +59,9 @@ The normal graphical launch uses two local wrappers:
 
 `~/.local/bin/start-hyprland` delegates to `/usr/bin/start-hyprland` with `--path ~/.local/bin/Hyprland`. `~/.local/bin/Hyprland` resolves both KMS cards and writes `~/.cache/hypr/uconsole-monitors.conf`. When the isolated Aquamarine fix is available, it opens DSI and HDMI at startup even if the HDMI connector is currently unplugged. That makes later connect/disconnect events work without restarting Hyprland. Both cards share the single V3D render node. If the fix is unavailable, the wrapper keeps the previous single-output recovery paths instead of leaving both screens black. Keep this wrapper startup-only: do not add `DRI_PRIME` or `WLR_RENDER_DRM_DEVICE`; those paths caused high CPU on this uConsole profile.
 
-HDMI connect/disconnect is checked by `uconsole-display-autoswitch`. In the
+HDMI connect/disconnect is checked by `uconsole-display-autoswitch`. On HDMI
+disconnect it waits for the single-DSI profile, then reapplies the current
+wallpaper. In the
 patched `dual` mode it never closes Hyprland. After a topology change it
 refreshes Waybar so its layer surfaces follow Kanshi's layout; on reconnection
 it first restores a lightweight poster on HDMI and loads the animated GIF in
@@ -199,9 +201,39 @@ The wallpaper script is:
 ~/.local/bin/uconsole-wallpaper
 ```
 
-GIF files use `swww` automatically. Static images use `swaybg`. Video wallpapers are intentionally unsupported on this device profile.
+`Super+Shift+W` opens a visual selector: each entry shows a 170×96 thumbnail
+next to its filename. Thumbnails are cached under `~/.cache/uconsole/` and are
+regenerated only when the wallpaper file changes. To create them in advance:
 
-The first `swww` load of a large GIF can be slow. To avoid a black screen at boot, the script loads a persistent poster image first and then loads the optimized GIF in the background.
+```sh
+uconsole-wallpaper thumbnails
+```
+
+Prepare and validate every GIF in advance (poster, thumbnail, and playback
+cache) with a report of failures:
+
+```sh
+uconsole-wallpaper-prepare
+```
+
+The report is saved at `~/.cache/uconsole/wallpaper-prepare-report.tsv`; source
+GIFs are never modified.
+
+GIF files are converted once to a high-quality cached MP4 (12 FPS, up to 1600 px
+wide, CRF 18) and
+played by `mpvpaper` pinned to CPU 3, nice 15, and capped at 35% of one core.
+Static images use `swaybg`; MP4 and WebM are also supported directly.
+
+The first conversion of a large GIF can be slow. The script automatically
+creates a persistent first-frame poster when needed, keeps it visible with
+`swaybg` while the MP4 is generated and the player starts, then removes it only
+after the animated wallpaper is ready. This also applies after unlocking, so
+there is no black background during restoration.
+
+When locking, `uconsole-lock` extracts the current GIF's first frame to
+`~/.cache/uconsole/lock-wallpaper.png`, stops the animated player while the
+lock is visible, and restores the wallpaper on unlock. Press `Super+\`` to test the
+same lock path used by the 10-minute idle timer.
 
 Pre-optimize all GIF wallpapers:
 
@@ -221,8 +253,9 @@ The picker still shows only the original GIF. The sidecar files are hidden from 
 Useful environment overrides:
 
 ```sh
-UCONSOLE_WALLPAPER_OPTIMIZED_GIFS=0 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
-UCONSOLE_WALLPAPER_BACKEND=swww uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
+UCONSOLE_WALLPAPER_FPS=10 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
+UCONSOLE_WALLPAPER_LIMIT=25 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
+UCONSOLE_WALLPAPER_WIDTH=1920 UCONSOLE_WALLPAPER_CRF=16 uconsole-wallpaper set ~/Pictures/Wallpapers/file.gif
 ```
 
 ## Bundled Binaries
@@ -232,6 +265,8 @@ The repo includes ARM64 binaries for convenience:
 ```text
 bin/swww
 bin/swww-daemon
+bin/mpvpaper
+bin/mpvpaper-holder
 ```
 
 Rebuild `swww` locally:
