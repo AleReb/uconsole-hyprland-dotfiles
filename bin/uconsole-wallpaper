@@ -30,7 +30,7 @@ list_wallpapers() {
         if [ "$dir" = "/usr/share/hypr" ]; then
             find "$dir" -maxdepth 1 -type f -iname 'wall*.png'
         else
-            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o \( -iname '*.png' ! -iname '*.swww.png' \) -o -iname '*.webp' -o \( -iname '*.gif' ! -iname '*.swww.gif' \) -o -iname '*.mp4' -o -iname '*.webm' \)
+            find "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o \( -iname '*.png' ! -iname '*.swww.png' \) -o -iname '*.webp' -o \( -iname '*.gif' ! -iname '*.swww.gif' \) -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' \)
         fi
     done | sort -u
 }
@@ -74,7 +74,7 @@ generate_thumbnails() {
 
 is_animated_wallpaper() {
     case "$1" in
-        *.[Gg][Ii][Ff]|*.[Mm][Pp]4|*.[Ww][Ee][Bb][Mm]) return 0 ;;
+        *.[Gg][Ii][Ff]|*.[Mm][Pp]4|*.[Ww][Ee][Bb][Mm]|*.[Mm][Kk][Vv]) return 0 ;;
         *) return 1 ;;
     esac
 }
