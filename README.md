@@ -219,6 +219,13 @@ uconsole-wallpaper-prepare
 The report is saved at `~/.cache/uconsole/wallpaper-prepare-report.tsv`; source
 GIFs are never modified.
 
+For imported `usman-*` video wallpapers, create low-load 1280x720/12 FPS
+versions in place and remove the known higher-FPS/resolution variants:
+
+```sh
+uconsole-wallpaper-optimize-videos --delete-redundant
+```
+
 GIF files are converted once to a high-quality cached MP4 (12 FPS, up to 1600 px
 wide, CRF 18) and
 played by `mpvpaper` pinned to CPU 3, nice 15, and capped at 35% of one core.

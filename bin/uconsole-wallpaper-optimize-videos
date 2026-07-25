@@ -1,0 +1,61 @@
+#!/bin/sh
+set -eu
+
+wallpaper_dir="${UCONSOLE_WALLPAPER_DIR:-$HOME/.local/share/wallpapers}"
+fps="${UCONSOLE_VIDEO_FPS:-12}"
+width="${UCONSOLE_VIDEO_WIDTH:-1280}"
+crf="${UCONSOLE_VIDEO_CRF:-20}"
+delete_variants=0
+
+if [ "${1:-}" = "--delete-redundant" ]; then
+    delete_variants=1
+fi
+
+command -v ffmpeg >/dev/null 2>&1 || {
+    printf 'Missing command: ffmpeg\n' >&2
+    exit 2
+}
+
+if [ "$delete_variants" -eq 1 ]; then
+    for redundant in \
+        'usman-characters--knight-camping-dark-souls-3-HD-live.mp4' \
+        'usman-characters--mario-pixel-room-1920x1080-24fps.mp4' \
+        'usman-characters--mario-pixel-room-1920x1080-30fps.mp4' \
+        'usman-characters--mario-pixel-room.1920x1080.mp4' \
+        'usman-characters--uchiha-madara-naruto-1920x1080.mp4' \
+        'usman-characters--uchiha-madara-naruto.3840x2160.mp4'; do
+        rm -f "$wallpaper_dir/$redundant"
+    done
+fi
+
+list_file="$(mktemp "${XDG_CACHE_HOME:-$HOME/.cache}/uconsole/video-optimize.XXXXXX")"
+trap 'rm -f "$list_file"' EXIT HUP INT TERM
+find "$wallpaper_dir" -maxdepth 1 -type f -name 'usman-*' \( -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' \) -print > "$list_file"
+
+count=0
+saved=0
+while IFS= read -r input; do
+    [ -n "$input" ] || continue
+    before=$(stat -c '%s' "$input")
+    case "$input" in
+        *.mkv|*.MKV) temp="$input.tmp.$$.mkv" ;;
+        *) temp="$input.tmp.$$.mp4" ;;
+    esac
+
+    printf 'OPTIMIZE %s\n' "$(basename "$input")"
+    if ! ffmpeg -nostdin -y -v error -i "$input" \
+        -vf "fps=${fps},scale='trunc(min(${width},iw)/2)*2':-2:flags=lanczos" \
+        -an -c:v libx264 -preset veryfast -crf "$crf" -pix_fmt yuv420p -movflags +faststart \
+        "$temp"; then
+        rm -f "$temp"
+        printf 'FAIL %s\n' "$input" >&2
+        continue
+    fi
+    after=$(stat -c '%s' "$temp")
+    mv -f "$temp" "$input"
+    count=$((count + 1))
+    saved=$((saved + before - after))
+done < "$list_file"
+
+printf 'Summary: optimized=%s saved=%sMiB redundant_removed=%s\n' \
+    "$count" "$((saved / 1024 / 1024))" "$delete_variants"
