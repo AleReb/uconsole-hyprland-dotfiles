@@ -1,8 +1,8 @@
 #!/bin/sh
 
 battery=/sys/class/power_supply/axp20x-battery
-# Energía útil medida entre 100 % y 1 % en el ciclo del 2026-07-22.
-calibrated_full_uwh=30241687
+# Promedio útil de los ciclos completos del 2026-07-22 y 2026-07-27.
+calibrated_full_uwh=30171892
 calibrated_empty_pct=1
 
 read_value() {
@@ -25,6 +25,7 @@ energy_full_uwh=$(read_value energy_full 0)
 case "$capacity" in
     ''|*[!0-9]*) capacity=0 ;;
 esac
+sensor_capacity=$capacity
 case "$voltage_uv" in
     ''|*[!0-9-]*) voltage_uv=0 ;;
 esac
@@ -41,26 +42,115 @@ case "$energy_full_uwh" in
     ''|*[!0-9-]*) energy_full_uwh=0 ;;
 esac
 
-# El driver publica 42,18 Wh de diseño. Para los tiempos usamos los
-# 30,24 Wh que el conjunto entregó realmente hasta su límite calibrado.
-usable_capacity=$((capacity - calibrated_empty_pct))
-[ "$usable_capacity" -lt 0 ] && usable_capacity=0
-usable_range=$((100 - calibrated_empty_pct))
-energy_full_uwh=$calibrated_full_uwh
-energy_now_uwh=$((calibrated_full_uwh * usable_capacity / usable_range))
-
 absolute_current_ua=$current_ua
 [ "$absolute_current_ua" -lt 0 ] && absolute_current_ua=$((0 - absolute_current_ua))
 
-# El AXP puede conservar "Charging" después de apagar el LED de carga.
-# A 100 % y con 0,1 A o menos, la batería ya está en mantenimiento.
+# El AXP puede conservar "Charging" y publicar un porcentaje incorrecto
+# después de apagar el LED. Cerca de 4,2 V y con 0,1 A o menos, la batería
+# ya está en mantenimiento.
 if [ "$status" = Charging ] &&
-   [ "$capacity" -ge 100 ] &&
+   [ "$voltage_uv" -ge 4180000 ] &&
    [ "$absolute_current_ua" -le 100000 ]; then
     status=Full
 fi
 
 [ "$power_uw" -lt 0 ] && power_uw=$((0 - power_uw))
+
+# El contador del AXP y la integración entre reinicios pueden desviarse.
+# Estimamos el porcentaje solo con voltaje. La curva viene de las descargas
+# completas del 2026-07-22 y 2026-07-27 (30,24 y 30,10 Wh).
+state_root=${XDG_STATE_HOME:-"$HOME/.local/state"}
+estimate_dir="$state_root/uconsole-battery"
+voltage_state="$estimate_dir/voltage-estimate.state"
+now_epoch=$(date +%s)
+previous_epoch=0
+previous_status=Unknown
+previous_voltage_uv=0
+state_valid=0
+
+if [ -r "$voltage_state" ]; then
+    if IFS=' ' read -r previous_epoch previous_status previous_voltage_uv \
+        < "$voltage_state"; then
+        state_valid=1
+    fi
+fi
+
+case "$previous_epoch" in
+    ''|*[!0-9]*) previous_epoch=0; state_valid=0 ;;
+esac
+case "$previous_voltage_uv" in
+    ''|*[!0-9]*) previous_voltage_uv=0; state_valid=0 ;;
+esac
+
+smoothed_voltage_uv=$voltage_uv
+if [ "$state_valid" -eq 1 ] && [ "$status" = "$previous_status" ]; then
+    elapsed=$((now_epoch - previous_epoch))
+    if [ "$elapsed" -gt 0 ] && [ "$elapsed" -le 300 ]; then
+        # Suavizado corto para que un cambio momentáneo de carga no haga
+        # saltar el porcentaje. Solo se conservan muestras de voltaje.
+        smoothed_voltage_uv=$(((previous_voltage_uv * 3 + voltage_uv) / 4))
+    fi
+fi
+
+voltage_capacity() {
+    voltage_value=$1
+    if [ "$voltage_value" -ge 4050000 ]; then
+        printf '100\n'
+    elif [ "$voltage_value" -ge 4000000 ]; then
+        printf '%s\n' $((96 + (voltage_value - 4000000) * 4 / 50000))
+    elif [ "$voltage_value" -ge 3950000 ]; then
+        printf '%s\n' $((85 + (voltage_value - 3950000) * 11 / 50000))
+    elif [ "$voltage_value" -ge 3900000 ]; then
+        printf '%s\n' $((75 + (voltage_value - 3900000) * 10 / 50000))
+    elif [ "$voltage_value" -ge 3850000 ]; then
+        printf '%s\n' $((59 + (voltage_value - 3850000) * 16 / 50000))
+    elif [ "$voltage_value" -ge 3800000 ]; then
+        printf '%s\n' $((54 + (voltage_value - 3800000) * 5 / 50000))
+    elif [ "$voltage_value" -ge 3750000 ]; then
+        printf '%s\n' $((48 + (voltage_value - 3750000) * 6 / 50000))
+    elif [ "$voltage_value" -ge 3700000 ]; then
+        printf '%s\n' $((42 + (voltage_value - 3700000) * 6 / 50000))
+    elif [ "$voltage_value" -ge 3650000 ]; then
+        printf '%s\n' $((32 + (voltage_value - 3650000) * 10 / 50000))
+    elif [ "$voltage_value" -ge 3600000 ]; then
+        printf '%s\n' $((26 + (voltage_value - 3600000) * 6 / 50000))
+    elif [ "$voltage_value" -ge 3550000 ]; then
+        printf '%s\n' $((24 + (voltage_value - 3550000) * 2 / 50000))
+    elif [ "$voltage_value" -ge 3500000 ]; then
+        printf '%s\n' $((20 + (voltage_value - 3500000) * 4 / 50000))
+    elif [ "$voltage_value" -ge 3450000 ]; then
+        printf '%s\n' $((15 + (voltage_value - 3450000) * 5 / 50000))
+    elif [ "$voltage_value" -ge 3400000 ]; then
+        printf '%s\n' $((10 + (voltage_value - 3400000) * 5 / 50000))
+    elif [ "$voltage_value" -ge 3350000 ]; then
+        printf '%s\n' $((5 + (voltage_value - 3350000) * 5 / 50000))
+    elif [ "$voltage_value" -ge 3300000 ]; then
+        printf '%s\n' $((2 + (voltage_value - 3300000) * 3 / 50000))
+    else
+        printf '%s\n' "$calibrated_empty_pct"
+    fi
+}
+
+capacity=$(voltage_capacity "$smoothed_voltage_uv")
+if [ "$status" = Charging ] && [ "$capacity" -ge 100 ]; then
+    # No declarar 100 % mientras todavía entra corriente.
+    capacity=99
+elif [ "$status" = Full ]; then
+    capacity=100
+fi
+
+energy_full_uwh=$calibrated_full_uwh
+energy_now_uwh=$((energy_full_uwh * capacity / 100))
+[ "$capacity" -lt "$calibrated_empty_pct" ] && capacity=$calibrated_empty_pct
+[ "$capacity" -gt 100 ] && capacity=100
+
+mkdir -p "$estimate_dir"
+voltage_tmp="$voltage_state.$$"
+if printf '%s %s %s\n' "$now_epoch" "$status" "$smoothed_voltage_uv" \
+    > "$voltage_tmp"; then
+    mv -f "$voltage_tmp" "$voltage_state"
+fi
+
 voltage_mv=$(((voltage_uv + 500) / 1000))
 voltage=$(printf '%d.%03d' $((voltage_mv / 1000)) $((voltage_mv % 1000)))
 power_centiwatts=$(((power_uw + 5000) / 10000))
@@ -100,18 +190,12 @@ elif [ "$capacity" -le 20 ]; then
     css_class=warning
 fi
 
-format_minutes() {
+format_compact_time() {
     total=$1
-    hours=$((total / 60))
-    minutes=$((total % 60))
-    if [ "$hours" -gt 0 ]; then
-        printf '%s h %02d min' "$hours" "$minutes"
-    else
-        printf '%s min' "$minutes"
-    fi
+    printf '%d:%02d' $((total / 60)) $((total % 60))
 }
 
-time_label='No disponible'
+time_compact=
 if [ "$power_uw" -ge 50000 ]; then
     case "$status" in
         Discharging)
@@ -120,34 +204,22 @@ if [ "$power_uw" -ge 50000 ]; then
             fi
             if [ "$energy_now_uwh" -gt 0 ]; then
                 minutes=$(((energy_now_uwh * 60 + power_uw / 2) / power_uw))
-                time_label="$(format_minutes "$minutes") restantes"
+                time_compact=$(format_compact_time "$minutes")
             fi
             ;;
         Charging)
             remaining=$((energy_full_uwh - energy_now_uwh))
-            # Antes de completar la calibración el contador puede quedarse en
-            # 100 %. En ese caso estima lo que falta por el voltaje 1S Li-ion
-            # (3,30-4,20 V) y la potencia que realmente entra a la batería.
-            if [ "$remaining" -le 0 ] && [ "$energy_full_uwh" -gt 0 ]; then
-                voltage_delta=$((4200000 - voltage_uv))
-                [ "$voltage_delta" -lt 0 ] && voltage_delta=0
-                [ "$voltage_delta" -gt 900000 ] && voltage_delta=900000
-                remaining=$((energy_full_uwh * voltage_delta / 900000))
-            fi
             if [ "$remaining" -gt 0 ]; then
                 minutes=$(((remaining * 60 + power_uw / 2) / power_uw))
-                time_label="$(format_minutes "$minutes") para completar"
-            else
-                time_label='Menos de 10 min para completar'
+                time_compact=$(format_compact_time "$minutes")
             fi
             ;;
-        Full)
-            time_label='Carga completa'
-            ;;
     esac
-elif [ "$status" = Full ]; then
-    time_label='Carga completa'
 fi
 
-printf '{"text":"%s %s","tooltip":"Estado: %s\\nVoltaje: %s V\\nFlujo de batería: %s W\\nTiempo estimado: %s","class":"%s"}\n' \
-    "$short" "$capacity" "$state" "$voltage" "$power" "$time_label" "$css_class"
+bar_text="$short $capacity"
+[ -n "$time_compact" ] || time_compact='--'
+
+printf '{"text":"%s","tooltip":"Estado: %s\\nVoltaje: %s V\\nFlujo de batería: %s W\\nTiempo estimado: %s\\nSensor AXP: %s%%","class":"%s"}\n' \
+    "$bar_text" "$state" "$voltage" "$power" "$time_compact" \
+    "$sensor_capacity" "$css_class"

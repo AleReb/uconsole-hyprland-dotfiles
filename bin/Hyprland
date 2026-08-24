@@ -9,6 +9,26 @@ patch_prefix=${UCONSOLE_AQUAMARINE_PREFIX:-"$HOME/.local/opt/aquamarine-0.11-uco
 patch_lib="$patch_prefix/lib/libaquamarine.so.10"
 dynamic_loader=/lib/ld-linux-aarch64.so.1
 
+# This is deliberately a graphics readiness check, never a network check.
+# On a cold CM5 boot the DRM nodes can appear a little after the TTY login;
+# starting before then can make Hyprland select the fallback monitor path.
+wait_for_graphics() {
+    attempts=0
+    while [ "$attempts" -lt 20 ]; do
+        for node in /dev/dri/renderD*; do
+            [ -c "$node" ] || continue 2
+            for connector in /sys/class/drm/card*-DSI-*; do
+                [ -e "$connector" ] && return 0
+            done
+        done
+        attempts=$((attempts + 1))
+        sleep 1
+    done
+    return 0
+}
+
+wait_for_graphics
+
 card_from_connector() {
     for connector in "$@"; do
         [ -e "$connector" ] || continue

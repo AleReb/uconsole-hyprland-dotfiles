@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Start Hyprland only from the local TTY1 login. Any key during the countdown
+# cancels this attempt and leaves the normal interactive shell available.
+if [ "$(tty 2>/dev/null)" != /dev/tty1 ] || [ ! -t 0 ] || [ ! -t 1 ]; then
+    exit 0
+fi
+
+if ! command -v start-hyprland >/dev/null 2>&1; then
+    printf 'No se encontró start-hyprland; inicio automático omitido.\n' >&2
+    exit 0
+fi
+
+uconsole_count=3
+while [ "$uconsole_count" -gt 0 ]; do
+    printf '\rHyprland iniciará en %d... pulsa cualquier tecla para cancelar. ' "$uconsole_count"
+    if IFS= read -r -s -n 1 -t 1 uconsole_key; then
+        printf '\rInicio automático cancelado.                                    \n'
+        exit 0
+    fi
+    uconsole_count=$((uconsole_count - 1))
+done
+
+printf '\rIniciando Hyprland...                                             \n'
+exec start-hyprland

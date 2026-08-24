@@ -1,0 +1,14 @@
+#!/bin/sh
+# Keep Chromium's disposable cache off the USB-backed /home filesystem.
+# The persistent profile (bookmarks, sessions, extensions) stays unchanged.
+set -eu
+
+cache_dir=/dev/shm/uconsole-chromium-cache
+mkdir -p "$cache_dir"
+chmod 700 "$cache_dir"
+
+exec /usr/bin/chromium \
+    "--disk-cache-dir=$cache_dir" \
+    --disk-cache-size=1073741824 \
+    --media-cache-size=268435456 \
+    "$@"

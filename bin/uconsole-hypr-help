@@ -80,6 +80,9 @@ System
 
 Notes
   Super + T is kept as a terminal alias for the uConsole layout.
+  Raspberry Pi Connect is disabled: WayVNC could repeatedly restart after
+  the Wayland session was lost during lock. Re-enable it with:
+  systemctl --user enable --now rpi-connect.service
 
 Help navigation
   Arrows / wheel       Scroll

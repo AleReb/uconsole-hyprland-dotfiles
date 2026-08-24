@@ -11,4 +11,4 @@ printf 'You may be asked for sudo.\n\n'
 "$ROOT/scripts/build-aquamarine-uconsole.sh"
 "$ROOT/scripts/install.sh"
 
-printf '\nDone. From TTY, run start-hyprland to enter Hyprland.\n'
+printf '\nDone. TTY1 starts Hyprland after three seconds; press any key to cancel.\n'

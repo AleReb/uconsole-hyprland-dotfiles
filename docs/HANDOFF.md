@@ -112,7 +112,7 @@ hwdata
 ## Technical Decisions
 
 - Active state observed on 2026-06-14: the live desktop may have a generated theme and selected wallpaper. Those values are user state created by `uconsole-theme` and `uconsole-wallpaper`; the repo keeps portable defaults.
-- Graphical login: the installer leaves the default boot target and display-manager state unchanged. On this uConsole, TTY1 autologins as `uconsole`; run `start-hyprland` manually to enter the validated DSI/HDMI session.
+- Graphical login: the installer leaves the default boot target and display-manager state unchanged. On this uConsole, TTY1 autologins as `uconsole`; `~/.profile` runs `uconsole-tty-autostart`, which counts down for three seconds and starts `start-hyprland`. Any key cancels that attempt and leaves the normal terminal available, where `start-hyprland` can still be run manually.
 - CPU startup policy: `uconsole-cpu-boot-cap.service` limits the CPU to 1.8 GHz before local filesystem checks. `uconsole-cpu-power.service` keeps that limit through Hyprland startup, then permits 2.4 GHz on battery or the configured 3 GHz ceiling on external power.
 - Battery status: Waybar runs `uconsole-battery-status` every ten seconds. It reads the AXP power-supply sysfs data and reports state, capacity, voltage, battery power flow, and an estimated remaining/charging time.
 - Launch wrappers: `~/.local/bin/start-hyprland` should remain a thin wrapper around `/usr/bin/start-hyprland --path "$HOME/.local/bin/Hyprland"`. `~/.local/bin/Hyprland` resolves both KMS cards, writes `~/.cache/hypr/uconsole-monitors.conf`, loads the isolated library through the ARM64 dynamic loader, and then execs `/usr/bin/Hyprland`.
@@ -152,7 +152,7 @@ hwdata
 
 ## Recommended Follow-Up
 
-- Reboot once, confirm TTY1 autologin, and run `start-hyprland` manually.
+- Reboot once, confirm TTY1 autologin, let the three-second countdown start Hyprland, then repeat and press a key to confirm cancellation leaves the terminal usable.
 - Keep at least one static PNG wallpaper as a fallback for boot or low-battery situations.
 - Commit the bundled binary update together with `docs/THIRD_PARTY.md` so the repo clearly documents what was built.
 - If disk space matters, remove local build trees such as `~/src/swww` only after confirming the bundled `bin/swww` and `bin/swww-daemon` work from a fresh install.

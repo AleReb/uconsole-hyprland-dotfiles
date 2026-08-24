@@ -31,7 +31,9 @@ cd ~/uconsole-hyprland-dotfiles
 ```
 
 The installer does not enable a display manager or change the system's default
-boot target. From TTY, start the validated graphical session manually with:
+boot target. On TTY1 it shows a three-second countdown and starts the validated
+graphical session automatically. Press any key during the countdown to stay in
+the terminal. Manual startup remains available with:
 
 ```sh
 start-hyprland
@@ -87,9 +89,9 @@ it does not change outputs or configuration.
 
 ## DSI + HDMI Fix
 
-La explicación completa, el diagnóstico, la reconstrucción y la recuperación
-están en [`docs/DSI_HDMI_DUAL.md`](docs/DSI_HDMI_DUAL.md). El parche exacto de
-Aquamarine y su script de compilación también forman parte de este repositorio.
+The complete explanation, diagnosis, rebuild procedure, and recovery steps are
+in [`docs/DSI_HDMI_DUAL.md`](docs/DSI_HDMI_DUAL.md). The exact Aquamarine patch
+and its build script are also included in this repository.
 
 The packaged Hyprland 0.55.2 uses Aquamarine 0.11.0. On the CM5 uConsole,
 DSI and HDMI are separate KMS cards but there is only one V3D `renderD` node.
@@ -331,3 +333,19 @@ Review large third-party dotfile installers before running them, because they ca
 - `~/.config/dunst`
 - `~/.local/bin/uconsole-*`
 - `/etc/keyd/default.conf`
+
+## Disclaimer
+
+This project is provided as-is, without warranty of any kind. It modifies
+system configuration, installs software, and includes experimental display and
+power-management behavior intended for the ClockworkPi uConsole. Review the
+scripts and back up your current configuration before installation. You are
+responsible for any data loss, hardware damage, system instability, or other
+consequences resulting from its use. Test recovery procedures before relying on
+this setup for important work.
+
+## License
+
+This project is licensed under the MIT License. See [`LICENSE`](LICENSE) for
+the full license text. Third-party components and bundled binaries remain under
+their respective licenses; see [`docs/THIRD_PARTY.md`](docs/THIRD_PARTY.md).

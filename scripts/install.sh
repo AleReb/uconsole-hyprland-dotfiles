@@ -17,6 +17,10 @@ need_cmd mkdir
 
 mkdir -p "$BACKUP"
 
+if [ -e "$HOME/.profile" ]; then
+    cp -a "$HOME/.profile" "$BACKUP/profile"
+fi
+
 for dir in hypr waybar wofi foot dunst uconsole gtk-3.0 kanshi; do
     if [ -e "$HOME/.config/$dir" ]; then
         cp -a "$HOME/.config/$dir" "$BACKUP/"
@@ -44,7 +48,7 @@ if [ -e /etc/keyd/default.conf ]; then
     sudo cp -a /etc/keyd/default.conf "/etc/keyd/default.conf.backup.$(date +%Y%m%d-%H%M%S)"
 fi
 
-mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share/wallpapers" "$HOME/Pictures/Wallpapers"
+mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/.local/share/wallpapers" "$HOME/Pictures/Wallpapers"
 
 cp -a "$ROOT/config/hypr" "$HOME/.config/"
 cp -a "$ROOT/config/waybar" "$HOME/.config/"
@@ -54,6 +58,7 @@ cp -a "$ROOT/config/dunst" "$HOME/.config/"
 cp -a "$ROOT/config/uconsole" "$HOME/.config/"
 cp -a "$ROOT/config/gtk-3.0" "$HOME/.config/"
 cp -a "$ROOT/config/kanshi" "$HOME/.config/"
+cp -a "$ROOT/config/applications"/. "$HOME/.local/share/applications/"
 cp -a "$ROOT/config/brightness_osd.sh" "$HOME/.config/"
 cp -a "$ROOT/config/volume_osd.sh" "$HOME/.config/"
 chmod +x "$HOME/.config/brightness_osd.sh" "$HOME/.config/volume_osd.sh"
@@ -106,5 +111,15 @@ fi
 EOF
 fi
 
+if ! grep -q 'uconsole-tty-autostart' "$HOME/.profile" 2>/dev/null; then
+    cat >> "$HOME/.profile" <<'EOF'
+
+# On local TTY1, start Hyprland after a cancellable three-second countdown.
+if [ -x "$HOME/.local/bin/uconsole-tty-autostart" ]; then
+    "$HOME/.local/bin/uconsole-tty-autostart"
+fi
+EOF
+fi
+
 printf 'Installed. Backup: %s\n' "$BACKUP"
-printf 'From TTY, run start-hyprland to enter Hyprland.\n'
+printf 'TTY1 starts Hyprland after three seconds; press any key to stay in the terminal.\n'
