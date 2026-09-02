@@ -8,6 +8,7 @@ printf '%s\n' 'This will install Debian packages, build the isolated Aquamarine 
 printf 'You may be asked for sudo.\n\n'
 
 "$ROOT/scripts/packages-debian.sh"
+"$ROOT/scripts/install-jetbrainsmono-nerd-font.sh"
 "$ROOT/scripts/build-aquamarine-uconsole.sh"
 "$ROOT/scripts/install.sh"
 

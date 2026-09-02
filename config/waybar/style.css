@@ -1,13 +1,14 @@
 * {
   border: none;
-  font-family: "Nunito Sans", "DejaVu Sans", sans-serif;
+  font-family: "JetBrainsMono Nerd Font", "DejaVu Sans Mono", monospace;
   font-size: 13px;
   min-height: 0;
 }
 
 window#waybar {
-  background: transparent;
+  background: rgba(31, 35, 40, 0.96);
   color: #f8fafc;
+  border-bottom: 1px solid #c79bf0;
 }
 
 tooltip {
@@ -22,7 +23,7 @@ tooltip label {
 }
 
 #workspaces,
-#clock,
+#custom-clock,
 #custom-cpu,
 #custom-gpu,
 #temperature,
@@ -30,24 +31,25 @@ tooltip label {
 #bluetooth,
 #custom-battery,
 #tray {
-  background: rgba(31, 35, 40, 0.92);
-  border: 1px solid #c79bf0;
-  border-radius: 999px;
-  margin: 0 2px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  margin: 0;
 }
 
 #workspaces button {
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: 0;
   color: #93cee9;
 }
 
 #workspaces button.active {
   background: #93cee9;
   color: #1f2328;
+  border-bottom: 2px solid #c79bf0;
 }
 
-#clock,
+#custom-clock,
 #custom-cpu,
 #custom-gpu,
 #temperature,
@@ -55,7 +57,7 @@ tooltip label {
 #bluetooth,
 #custom-battery,
 #tray {
-  padding: 0 10px;
+  padding: 0 9px;
 }
 
 #custom-battery.warning {

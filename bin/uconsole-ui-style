@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+style="${1:-select}"
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole"
+
+list_styles() {
+    printf '%s\n' omarchy pills
+}
+
+pick_style() {
+    if command -v wofi >/dev/null 2>&1; then
+        list_styles | wofi --show dmenu --prompt "UI style"
+    else
+        list_styles
+    fi
+}
+
+apply_style() {
+    choice="$1"
+    case "$choice" in
+        omarchy|pills) ;;
+        *)
+            printf 'Unknown UI style: %s\n' "$choice" >&2
+            exit 2
+            ;;
+    esac
+
+    mkdir -p "$cache_dir"
+    printf '%s\n' "$choice" > "$cache_dir/ui-style"
+    current_theme="$(cat "$cache_dir/theme" 2>/dev/null || printf 'classic')"
+    "$HOME/.local/bin/uconsole-theme" "$current_theme"
+}
+
+case "$style" in
+    list) list_styles ;;
+    select)
+        chosen="$(pick_style)"
+        [ -n "$chosen" ] && apply_style "$chosen"
+        ;;
+    *) apply_style "$style" ;;
+esac

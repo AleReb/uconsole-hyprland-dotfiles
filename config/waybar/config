@@ -2,12 +2,12 @@
   "layer": "top",
   "position": "top",
   "height": 34,
-  "spacing": 6,
-  "margin-top": 4,
-  "margin-left": 6,
-  "margin-right": 6,
+  "spacing": 0,
+  "margin-top": 0,
+  "margin-left": 0,
+  "margin-right": 0,
   "modules-left": ["hyprland/workspaces"],
-  "modules-center": ["clock"],
+  "modules-center": ["custom/clock"],
   "modules-right": ["temperature", "custom/cpu", "custom/gpu", "pulseaudio", "custom/battery", "tray"],
   "hyprland/workspaces": {
     "disable-scroll": true,
@@ -26,22 +26,11 @@
       "10": "10"
     }
   },
-  "clock": {
-    "format": "{:%d %b  %H:%M}",
-    "tooltip-format": "<tt><big>{calendar}</big></tt>",
-    "calendar": {
-      "mode": "month",
-      "mode-mon-col": 3,
-      "weeks-pos": "right",
-      "on-scroll": 1,
-      "format": {
-        "months": "<span color='#c4a7e7'><b>{}</b></span>",
-        "days": "<span color='#e0def4'>{}</span>",
-        "weeks": "<span color='#ebbcba'>W{}</span>",
-        "weekdays": "<span color='#ebbcba'><b>{}</b></span>",
-        "today": "<span color='#191724' background='#ebbcba'><b>{}</b></span>"
-      }
-    },
+  "custom/clock": {
+    "exec": "~/.local/bin/uconsole-clock-calendar",
+    "interval": 30,
+    "return-type": "json",
+    "tooltip": true,
     "on-click": "sh -c 'yad --calendar --width=640 --height=520 --fixed --no-buttons --title=Calendar >/dev/null 2>&1 &'"
   },
   "pulseaudio": {

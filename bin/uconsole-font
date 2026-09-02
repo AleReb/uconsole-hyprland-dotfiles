@@ -1,0 +1,51 @@
+#!/bin/sh
+set -eu
+
+font="${1:-select}"
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole"
+
+list_fonts() {
+    printf '%s\n' jetbrains classic dejavu liberation noto
+}
+
+pick_font() {
+    if command -v wofi >/dev/null 2>&1; then
+        list_fonts | wofi --show dmenu --prompt "Font"
+    else
+        list_fonts
+    fi
+}
+
+apply_font() {
+    choice="$1"
+    case "$choice" in
+        jetbrains) family="JetBrainsMono Nerd Font" ;;
+        classic) family="Nunito Sans" ;;
+        dejavu) family="DejaVu Sans Mono" ;;
+        liberation) family="Liberation Mono" ;;
+        noto) family="Noto Sans Mono" ;;
+        *)
+            printf 'Unknown font: %s\n' "$choice" >&2
+            exit 2
+            ;;
+    esac
+
+    if ! fc-list : family | grep -Fq "$family"; then
+        printf 'Font is not installed: %s\n' "$family" >&2
+        exit 3
+    fi
+
+    mkdir -p "$cache_dir"
+    printf '%s\n' "$choice" > "$cache_dir/font"
+    current_theme="$(cat "$cache_dir/theme" 2>/dev/null || printf 'classic')"
+    "$HOME/.local/bin/uconsole-theme" "$current_theme"
+}
+
+case "$font" in
+    list) list_fonts ;;
+    select)
+        chosen="$(pick_font)"
+        [ -n "$chosen" ] && apply_font "$chosen"
+        ;;
+    *) apply_font "$font" ;;
+esac

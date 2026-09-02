@@ -1,0 +1,29 @@
+#!/usr/bin/python3
+"""Waybar clock with a DST-safe monthly calendar tooltip."""
+
+import calendar
+import datetime
+import html
+import json
+import locale
+
+
+try:
+    locale.setlocale(locale.LC_TIME, "")
+except locale.Error:
+    pass
+
+now = datetime.datetime.now().astimezone()
+month = calendar.TextCalendar(firstweekday=calendar.MONDAY).formatmonth(
+    now.year, now.month
+)
+
+print(
+    json.dumps(
+        {
+            "text": now.strftime("%d %b  %H:%M"),
+            "tooltip": f"<tt><big>{html.escape(month)}</big></tt>",
+        },
+        ensure_ascii=False,
+    )
+)

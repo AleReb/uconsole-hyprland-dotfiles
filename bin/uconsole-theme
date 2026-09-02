@@ -4,7 +4,7 @@ set -eu
 theme="${1:-select}"
 
 list_themes() {
-    printf '%s\n' default rose green graphite
+    printf '%s\n' classic tokyo-night catppuccin-mocha gruvbox-dark nord dracula rose green graphite
 }
 
 pick_theme() {
@@ -18,20 +18,69 @@ pick_theme() {
 apply_theme() {
     name="$1"
     case "$name" in
-        default)
-            bg="1f2328"; bg2="101419"; panel="31, 35, 40"; fg="f8fafc"; accent1="93cee9"; accent2="c79bf0"; warn="facc15"; crit="f87171"
+        default|classic)
+            name="classic"
+            bg="1f2328"; bg2="101419"; panel="31, 35, 40"; fg="f8fafc"; accent1="93cee9"; accent2="c79bf0"; warn="facc15"; crit="f87171"; green="10b981"; white="e5e7eb"
+            ;;
+        tokyo-night)
+            bg="1a1b26"; bg2="16161e"; panel="26, 27, 38"; fg="c0caf5"; accent1="7aa2f7"; accent2="bb9af7"; warn="e0af68"; crit="f7768e"; green="9ece6a"; white="c0caf5"
+            ;;
+        catppuccin-mocha)
+            bg="1e1e2e"; bg2="181825"; panel="30, 30, 46"; fg="cdd6f4"; accent1="89b4fa"; accent2="cba6f7"; warn="f9e2af"; crit="f38ba8"; green="a6e3a1"; white="bac2de"
+            ;;
+        gruvbox-dark)
+            bg="282828"; bg2="1d2021"; panel="40, 40, 40"; fg="ebdbb2"; accent1="83a598"; accent2="d3869b"; warn="fabd2f"; crit="fb4934"; green="b8bb26"; white="ebdbb2"
+            ;;
+        nord)
+            bg="2e3440"; bg2="242933"; panel="46, 52, 64"; fg="eceff4"; accent1="88c0d0"; accent2="b48ead"; warn="ebcb8b"; crit="bf616a"; green="a3be8c"; white="e5e9f0"
+            ;;
+        dracula)
+            bg="282a36"; bg2="21222c"; panel="40, 42, 54"; fg="f8f8f2"; accent1="8be9fd"; accent2="bd93f9"; warn="f1fa8c"; crit="ff5555"; green="50fa7b"; white="f8f8f2"
             ;;
         rose)
-            bg="191724"; bg2="11101a"; panel="25, 23, 36"; fg="e0def4"; accent1="ebbcba"; accent2="c4a7e7"; warn="f6c177"; crit="eb6f92"
+            bg="191724"; bg2="11101a"; panel="25, 23, 36"; fg="e0def4"; accent1="ebbcba"; accent2="c4a7e7"; warn="f6c177"; crit="eb6f92"; green="9ccfd8"; white="e0def4"
             ;;
         green)
-            bg="101419"; bg2="0b1010"; panel="16, 20, 25"; fg="e5f9f0"; accent1="8ec07c"; accent2="83a598"; warn="fabd2f"; crit="fb4934"
+            bg="101419"; bg2="0b1010"; panel="16, 20, 25"; fg="e5f9f0"; accent1="8ec07c"; accent2="83a598"; warn="fabd2f"; crit="fb4934"; green="8ec07c"; white="e5f9f0"
             ;;
         graphite)
-            bg="16181d"; bg2="101217"; panel="22, 24, 29"; fg="f2f4f8"; accent1="c8d0e0"; accent2="8b949e"; warn="d7ba7d"; crit="e06c75"
+            bg="16181d"; bg2="101217"; panel="22, 24, 29"; fg="f2f4f8"; accent1="c8d0e0"; accent2="8b949e"; warn="d7ba7d"; crit="e06c75"; green="98c379"; white="f2f4f8"
             ;;
         *)
             printf 'Unknown theme: %s\n' "$name" >&2
+            exit 2
+            ;;
+    esac
+
+    font_choice="$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/uconsole/font" 2>/dev/null || printf 'jetbrains')"
+    case "$font_choice" in
+        jetbrains) font_ui="JetBrainsMono Nerd Font"; font_mono="JetBrainsMono Nerd Font Mono"; font_notify="$font_ui" ;;
+        classic) font_ui="Nunito Sans"; font_mono="DejaVu Sans Mono"; font_notify="DejaVu Sans" ;;
+        dejavu) font_ui="DejaVu Sans Mono"; font_mono="DejaVu Sans Mono"; font_notify="$font_ui" ;;
+        liberation) font_ui="Liberation Mono"; font_mono="Liberation Mono"; font_notify="$font_ui" ;;
+        noto) font_ui="Noto Sans Mono"; font_mono="Noto Sans Mono"; font_notify="$font_ui" ;;
+        *) font_choice="jetbrains"; font_ui="JetBrainsMono Nerd Font"; font_mono="JetBrainsMono Nerd Font Mono"; font_notify="$font_ui" ;;
+    esac
+
+    ui_style="$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/uconsole/ui-style" 2>/dev/null || printf 'omarchy')"
+    case "$ui_style" in
+        omarchy|omarchy-full)
+            ui_style="omarchy"
+            bar_background="rgba(${panel}, 0.96)"; bar_border="1px solid #${accent2}"
+            module_background="transparent"; module_border="none"; module_radius="0"; module_margin="0"
+            workspace_radius="0"; active_border="2px solid #${accent2}"; module_padding="9"
+            bar_spacing="0"; bar_margin_top="0"; bar_margin_side="0"
+            window_rounding="0"; widget_radius="0"; notification_radius="0"
+            ;;
+        pills)
+            bar_background="transparent"; bar_border="none"
+            module_background="rgba(${panel}, 0.92)"; module_border="1px solid #${accent2}"; module_radius="999px"; module_margin="0 2px"
+            workspace_radius="999px"; active_border="none"; module_padding="10"
+            bar_spacing="6"; bar_margin_top="4"; bar_margin_side="6"
+            window_rounding="8"; widget_radius="10"; notification_radius="10"
+            ;;
+        *)
+            printf 'Unknown UI style: %s\n' "$ui_style" >&2
             exit 2
             ;;
     esac
@@ -42,13 +91,23 @@ apply_theme() {
     foot_ini="$HOME/.config/foot/foot.ini"
     dunst_conf="$HOME/.config/dunst/dunstrc"
     theme_env="$HOME/.config/uconsole/theme.env"
+    waybar_config="$HOME/.config/waybar/config"
 
-    mkdir -p "$HOME/.config/dunst" "$HOME/.config/uconsole"
+    cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/uconsole"
+    mkdir -p "$HOME/.config/dunst" "$HOME/.config/uconsole" "$cache_dir"
 
     sed -i \
         -e "s/col.active_border = .*/col.active_border = rgba(${accent1}ff) rgba(${accent2}ff) 45deg/" \
         -e "s/col.inactive_border = .*/col.inactive_border = rgba(${bg}cc)/" \
+        -e "s/rounding = [0-9][0-9]*/rounding = ${window_rounding}/" \
         "$hypr"
+
+    sed -i \
+        -e "s/\"spacing\": [0-9][0-9]*/\"spacing\": ${bar_spacing}/" \
+        -e "s/\"margin-top\": [0-9][0-9]*/\"margin-top\": ${bar_margin_top}/" \
+        -e "s/\"margin-left\": [0-9][0-9]*/\"margin-left\": ${bar_margin_side}/" \
+        -e "s/\"margin-right\": [0-9][0-9]*/\"margin-right\": ${bar_margin_side}/" \
+        "$waybar_config"
 
     cat > "$theme_env" <<EOF
 UCONSOLE_THEME=${name}
@@ -60,25 +119,30 @@ UCONSOLE_ACCENT1=${accent1}
 UCONSOLE_ACCENT2=${accent2}
 UCONSOLE_WARN=${warn}
 UCONSOLE_CRIT=${crit}
+UCONSOLE_FONT=${font_choice}
+UCONSOLE_FONT_UI="${font_ui}"
+UCONSOLE_FONT_MONO="${font_mono}"
+UCONSOLE_UI_STYLE=${ui_style}
 EOF
 
     cat > "$waybar" <<EOF
 * {
   border: none;
-  font-family: "Nunito Sans", "DejaVu Sans", sans-serif;
+  font-family: "${font_ui}", "DejaVu Sans Mono", monospace;
   font-size: 13px;
   min-height: 0;
 }
 
 window#waybar {
-  background: transparent;
+  background: ${bar_background};
   color: #${fg};
+  border-bottom: ${bar_border};
 }
 
 tooltip {
   background: rgba(${panel}, 0.96);
   border: 1px solid #${accent2};
-  border-radius: 10px;
+  border-radius: ${widget_radius}px;
   padding: 8px 10px;
 }
 
@@ -87,47 +151,48 @@ tooltip label {
 }
 
 #workspaces,
-#clock,
+#custom-clock,
 #custom-cpu,
 #custom-gpu,
 #temperature,
 #pulseaudio,
 #bluetooth,
-#battery,
+#custom-battery,
 #tray {
-  background: rgba(${panel}, 0.92);
-  border: 1px solid #${accent2};
-  border-radius: 999px;
-  margin: 0 2px;
+  background: ${module_background};
+  border: ${module_border};
+  border-radius: ${module_radius};
+  margin: ${module_margin};
 }
 
 #workspaces button {
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: ${workspace_radius};
   color: #${accent1};
 }
 
 #workspaces button.active {
   background: #${accent1};
   color: #${bg};
+  border-bottom: ${active_border};
 }
 
-#clock,
+#custom-clock,
 #custom-cpu,
 #custom-gpu,
 #temperature,
 #pulseaudio,
 #bluetooth,
-#battery,
+#custom-battery,
 #tray {
-  padding: 0 10px;
+  padding: 0 ${module_padding}px;
 }
 
-#battery.warning {
+#custom-battery.warning {
   color: #${warn};
 }
 
-#battery.critical,
+#custom-battery.critical,
 #temperature.critical {
   color: #${crit};
 }
@@ -139,7 +204,7 @@ tooltip, .tooltip {
   background-color: rgba(${panel}, 0.96);
   color: #${fg};
   border: 1px solid #${accent2};
-  border-radius: 10px;
+  border-radius: ${widget_radius}px;
   padding: 8px 10px;
 }
 
@@ -164,17 +229,17 @@ EOF
 window {
   background-color: rgba(${panel}, 0.96);
   color: #${fg};
-  font-family: "Nunito Sans", "DejaVu Sans", sans-serif;
+  font-family: "${font_ui}", "DejaVu Sans Mono", monospace;
   font-size: 14px;
   border: 1px solid #${accent2};
-  border-radius: 12px;
+  border-radius: ${widget_radius}px;
 }
 
 #input {
   margin: 8px;
   padding: 10px;
   border: 1px solid #${accent1};
-  border-radius: 10px;
+  border-radius: ${widget_radius}px;
   background-color: #${bg2};
   color: #${fg};
 }
@@ -191,7 +256,7 @@ EOF
 
     cat > "$foot_ini" <<EOF
 [main]
-font=DejaVu Sans Mono:size=11
+font=${font_mono}:size=11
 pad=8x8
 term=xterm-256color
 
@@ -200,12 +265,12 @@ background=${bg}
 foreground=${fg}
 regular0=${bg}
 regular1=${crit}
-regular2=10b981
+regular2=${green}
 regular3=${warn}
 regular4=${accent1}
 regular5=${accent2}
 regular6=${accent1}
-regular7=e5e7eb
+regular7=${white}
 EOF
 
     cat > "$dunst_conf" <<EOF
@@ -218,7 +283,7 @@ origin = top-right
 offset = (10, 44)
 scale = 0
 notification_limit = 3
-font = DejaVu Sans 10
+font = ${font_notify} 10
 line_height = 2
 padding = 10
 horizontal_padding = 12
@@ -226,7 +291,7 @@ text_icon_padding = 8
 frame_width = 2
 frame_color = "#${accent2}"
 separator_color = frame
-corner_radius = 10
+corner_radius = ${notification_radius}
 progress_bar = true
 progress_bar_height = 8
 progress_bar_frame_width = 0
@@ -254,7 +319,7 @@ frame_color = "#${crit}"
 timeout = 0
 EOF
 
-    printf '%s\n' "$name" > "${XDG_CACHE_HOME:-$HOME/.cache}/uconsole/theme"
+    printf '%s\n' "$name" > "$cache_dir/theme"
 
     hyprctl reload >/dev/null 2>&1 || true
     pkill -x dunst >/dev/null 2>&1 || true
